@@ -7,17 +7,25 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,28 +35,37 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.keal.nexus.data.ModelCatalog
@@ -60,12 +77,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-private val Ink = Color(0xFF090D12)
-private val Panel = Color(0xFF131A22)
-private val Mint = Color(0xFFB8F2D0)
-private val Muted = Color(0xFF93A0AE)
-private val MainText = Color(0xFFEAF0F6)
-private val Warning = Color(0xFFFFC875)
+// ── Design tokens ────────────────────────────────────────────────────────────
+private val Ink        = Color(0xFF090D12)
+private val Surface0   = Color(0xFF0F1620)
+private val Surface1   = Color(0xFF161F2B)
+private val Surface2   = Color(0xFF1E2A38)
+private val Mint       = Color(0xFF6EE7B7)
+private val MintDim    = Color(0xFF34D399)
+private val Accent     = Color(0xFF818CF8)
+private val Muted      = Color(0xFF64748B)
+private val MutedLight = Color(0xFF94A3B8)
+private val MainText   = Color(0xFFE2E8F0)
+private val Warning    = Color(0xFFFBBF24)
+private val Success    = Color(0xFF34D399)
+private val Danger     = Color(0xFFF87171)
+private val Border     = Color(0xFF1E2D3D)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -78,13 +104,15 @@ class MainActivity : ComponentActivity() {
 private fun NexusTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(
-            primary = Mint,
-            onPrimary = Ink,
-            secondary = Color(0xFF9CB8FF),
-            background = Ink,
-            surface = Panel,
-            onSurface = MainText,
-            onBackground = MainText
+            primary        = Mint,
+            onPrimary      = Ink,
+            secondary      = Accent,
+            background     = Ink,
+            surface        = Surface1,
+            surfaceVariant = Surface2,
+            onSurface      = MainText,
+            onBackground   = MainText,
+            outline        = Border
         ),
         content = content
     )
@@ -101,16 +129,23 @@ private data class ActiveDownload(val id: Long, val model: ModelSpec)
 @Composable
 private fun NexusApp() {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var destination by remember { mutableStateOf(Destination.HOME) }
-    var installed by remember { mutableStateOf(ModelManager.installedModels(context)) }
-    var activeDownload by remember { mutableStateOf<ActiveDownload?>(null) }
-    var downloadProgress by remember { mutableFloatStateOf(0f) }
-    var downloadedBytes by remember { mutableLongStateOf(0L) }
+    val scope   = rememberCoroutineScope()
+    val snackbar = remember { SnackbarHostState() }
+
+    var destination        by remember { mutableStateOf(Destination.HOME) }
+    var installed          by remember { mutableStateOf(ModelManager.installedModels(context)) }
+    var activeDownload     by remember { mutableStateOf<ActiveDownload?>(null) }
+    var downloadProgress   by remember { mutableFloatStateOf(0f) }
+    var downloadedBytes    by remember { mutableLongStateOf(0L) }
     var totalDownloadBytes by remember { mutableLongStateOf(-1L) }
     var downloadDiagnostic by remember { mutableStateOf("Waiting for Android Download Manager…") }
-    var notice by remember { mutableStateOf("Your models stay on this device.") }
-    var isBusy by remember { mutableStateOf(false) }
+    var notice             by remember { mutableStateOf("Your models stay on this device.") }
+    var isBusy             by remember { mutableStateOf(false) }
+
+    fun showNotice(msg: String) {
+        notice = msg
+        scope.launch { snackbar.showSnackbar(msg) }
+    }
 
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -123,9 +158,9 @@ private fun NexusApp() {
                 }
                 result.onSuccess {
                     installed = ModelManager.installedModels(context)
-                    notice = "Imported " + it.name
+                    showNotice("Imported ${it.name}")
                 }.onFailure {
-                    notice = it.message ?: "Could not import model."
+                    showNotice(it.message ?: "Could not import model.")
                 }
                 isBusy = false
             }
@@ -139,37 +174,36 @@ private fun NexusApp() {
                 ModelManager.queryDownload(context, current.id)
             }
             if (snapshot == null) {
-                notice = "Download status is unavailable."
+                showNotice("Download status unavailable.")
                 activeDownload = null
                 break
             }
-            downloadProgress = snapshot.progress.coerceIn(0f, 1f)
-            downloadedBytes = snapshot.downloadedBytes.coerceAtLeast(0L)
+            downloadProgress   = snapshot.progress.coerceIn(0f, 1f)
+            downloadedBytes    = snapshot.downloadedBytes.coerceAtLeast(0L)
             totalDownloadBytes = snapshot.totalBytes
-            downloadDiagnostic = "Android status " + snapshot.status + " · reason " + snapshot.reason
+            downloadDiagnostic = "Status ${snapshot.status} · reason ${snapshot.reason}"
             when (snapshot.status) {
                 DownloadManager.STATUS_SUCCESSFUL -> {
-                    val file = ModelManager.modelFile(context, current.model)
+                    val file     = ModelManager.modelFile(context, current.model)
                     val checksum = current.model.sha256
                     val verified = checksum == null || withContext(Dispatchers.IO) {
                         ModelManager.verifySha256(file, checksum)
                     }
                     if (verified) {
                         installed = ModelManager.installedModels(context)
-                        notice = if (checksum == null) {
-                            "Downloaded " + current.model.name + ". Review its model card."
-                        } else {
-                            "Downloaded and checksum-verified " + current.model.name + "."
-                        }
+                        showNotice(
+                            if (checksum == null) "Downloaded ${current.model.name}. Review its model card."
+                            else "✓ Downloaded & verified ${current.model.name}."
+                        )
                     } else {
                         withContext(Dispatchers.IO) { file.delete() }
-                        notice = "Checksum mismatch. The downloaded file was deleted."
+                        showNotice("⚠ Checksum mismatch — file deleted for safety.")
                     }
                     activeDownload = null
                     break
                 }
                 DownloadManager.STATUS_FAILED -> {
-                    notice = "Download failed. Check connection and available storage."
+                    showNotice("Download failed. Check connection and storage.")
                     activeDownload = null
                     break
                 }
@@ -180,151 +214,261 @@ private fun NexusApp() {
 
     Scaffold(
         containerColor = Ink,
+        snackbarHost   = { SnackbarHost(snackbar) },
         bottomBar = {
-            NavigationBar(containerColor = Panel, contentColor = MainText) {
-                Destination.entries.forEach { item ->
-                    NavigationBarItem(
-                        selected = destination == item,
-                        onClick = { destination = item },
-                        icon = { Text(item.symbol, fontSize = 20.sp) },
-                        label = { Text(item.label) }
-                    )
-                }
-            }
+            NexusNavBar(
+                current   = destination,
+                onChange  = { destination = it }
+            )
         }
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).background(Ink)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(Ink)
         ) {
             TopHeader()
             when (destination) {
-                Destination.HOME -> HomeScreen(
+                Destination.HOME    -> HomeScreen(
                     installedCount = installed.size,
-                    notice = notice,
-                    onOpenModels = { destination = Destination.MODELS },
-                    onOpenAgent = { context.startActivity(Intent(context, com.keal.nexus.agent.AgentActivity::class.java)) }
+                    notice         = notice,
+                    onOpenModels   = { destination = Destination.MODELS },
+                    onOpenAgent    = { context.startActivity(Intent(context, com.keal.nexus.agent.AgentActivity::class.java)) }
                 )
-                Destination.MODELS -> ModelsScreen(
-                    installed = installed,
+                Destination.MODELS  -> ModelsScreen(
+                    installed      = installed,
                     activeDownload = activeDownload,
-                    progress = downloadProgress,
-                    downloadedBytes = downloadedBytes,
-                    totalBytes = totalDownloadBytes,
-                    diagnostic = downloadDiagnostic,
-                    notice = notice,
-                    isBusy = isBusy,
-                    onDownload = { model ->
+                    progress       = downloadProgress,
+                    downloadedBytes= downloadedBytes,
+                    totalBytes     = totalDownloadBytes,
+                    diagnostic     = downloadDiagnostic,
+                    notice         = notice,
+                    isBusy         = isBusy,
+                    onDownload     = { model ->
                         if (activeDownload != null) {
-                            notice = "Finish the current download before starting another."
+                            showNotice("Finish the current download first.")
                         } else {
                             runCatching { ModelManager.enqueueDownload(context, model) }
                                 .onSuccess { id ->
-                                    activeDownload = ActiveDownload(id, model)
+                                    activeDownload   = ActiveDownload(id, model)
                                     downloadProgress = 0f
-                                    notice = "Downloading " + model.name + ". Wi-Fi is required."
+                                    showNotice("Downloading ${model.name} — Wi-Fi required.")
                                 }
-                                .onFailure { notice = it.message ?: "Could not start download." }
+                                .onFailure { showNotice(it.message ?: "Could not start download.") }
                         }
                     },
-                    onImport = { importLauncher.launch(arrayOf("*/*")) },
-                    onDelete = { fileName ->
+                    onImport       = { importLauncher.launch(arrayOf("*/*")) },
+                    onDelete       = { fileName ->
                         scope.launch {
                             withContext(Dispatchers.IO) { ModelManager.deleteModel(context, fileName) }
                             installed = ModelManager.installedModels(context)
-                            notice = "Removed " + fileName
+                            showNotice("Removed $fileName")
                         }
                     }
                 )
-                Destination.SETTINGS -> SettingsScreen(notice)
+                Destination.SETTINGS -> SettingsScreen()
             }
         }
     }
 }
 
+// ── Navigation bar ────────────────────────────────────────────────────────────
+@Composable
+private fun NexusNavBar(current: Destination, onChange: (Destination) -> Unit) {
+    NavigationBar(
+        containerColor = Surface0,
+        tonalElevation = 0.dp
+    ) {
+        Destination.entries.forEach { item ->
+            NavigationBarItem(
+                selected  = current == item,
+                onClick   = { onChange(item) },
+                icon      = { Text(item.symbol, fontSize = 18.sp) },
+                label     = { Text(item.label, fontSize = 11.sp) },
+                colors    = NavigationBarItemDefaults.colors(
+                    selectedIconColor   = Mint,
+                    selectedTextColor   = Mint,
+                    indicatorColor      = Surface2,
+                    unselectedIconColor = Muted,
+                    unselectedTextColor = Muted
+                )
+            )
+        }
+    }
+}
+
+// ── Top header ────────────────────────────────────────────────────────────────
 @Composable
 private fun TopHeader() {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 18.dp),
+        modifier          = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Logo
         Box(
-            modifier = Modifier.size(42.dp).background(Mint, RoundedCornerShape(14.dp)),
-            contentAlignment = Alignment.Center
+            modifier          = Modifier
+                .size(40.dp)
+                .background(
+                    brush  = Brush.linearGradientBrush(listOf(Mint, Accent)),
+                    shape  = RoundedCornerShape(12.dp)
+                ),
+            contentAlignment  = Alignment.Center
         ) {
-            Text("N", color = Ink, fontSize = 23.sp, fontWeight = FontWeight.Black)
+            Text("N", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Black)
         }
         Spacer(Modifier.width(12.dp))
         Column {
-            Text("NEXUS AI", color = MainText, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-            Text("LOCAL INTELLIGENCE", color = Muted, fontSize = 9.sp, letterSpacing = 2.sp)
+            Text("Nexus AI", color = MainText, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text("Local Intelligence", color = Muted, fontSize = 11.sp)
         }
         Spacer(Modifier.weight(1f))
-        Text("V0.1", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Chip("v0.2")
     }
 }
 
 @Composable
-private fun HomeScreen(installedCount: Int, notice: String, onOpenModels: () -> Unit, onOpenAgent: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
+private fun Chip(label: String, color: Color = Mint) {
+    Box(
+        modifier         = Modifier
+            .background(color.copy(alpha = 0.12f), RoundedCornerShape(20.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+    ) {
+        Text(label, color = color, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+// ── Home screen ───────────────────────────────────────────────────────────────
+@Composable
+private fun HomeScreen(
+    installedCount: Int,
+    notice: String,
+    onOpenModels: () -> Unit,
+    onOpenAgent: () -> Unit
+) {
+    LazyColumn(
+        modifier            = Modifier.fillMaxSize(),
+        contentPadding      = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Spacer(Modifier.height(4.dp))
-        Text("Your AI. Your device. Your data.", color = MainText, fontSize = 29.sp, lineHeight = 35.sp, fontWeight = FontWeight.Bold)
-        Text("A private space for running open-weight AI models locally.", color = Muted, fontSize = 14.sp, lineHeight = 21.sp)
-        Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("DEVICE STATUS", color = Muted, fontSize = 10.sp, letterSpacing = 2.sp)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(9.dp).background(Warning, CircleShape))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Inference engine not connected yet", color = MainText, fontSize = 13.sp)
-                }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    "This build manages model files. Offline text generation arrives with the native runtime milestone.",
-                    color = Muted,
-                    fontSize = 12.sp,
-                    lineHeight = 18.sp
+                    "Your AI.\nYour device.\nYour data.",
+                    color      = MainText,
+                    fontSize   = 28.sp,
+                    lineHeight = 34.sp,
+                    fontWeight = FontWeight.Bold
                 )
-                Divider(color = Color(0xFF27313C))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column {
-                        Text(installedCount.toString(), color = MainText, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                        Text("LOCAL MODELS", color = Muted, fontSize = 9.sp, letterSpacing = 1.5.sp)
-                    }
-                    Spacer(Modifier.weight(1f))
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Button(onClick = onOpenModels, colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) {
-                            Text("Explore models", fontWeight = FontWeight.Bold)
+                Text(
+                    "Run open-weight AI privately — no cloud, no tracking.",
+                    color      = MutedLight,
+                    fontSize   = 14.sp,
+                    lineHeight = 20.sp
+                )
+            }
+        }
+
+        // Status card
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Surface1),
+                shape  = RoundedCornerShape(20.dp)
+            ) {
+                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    SectionLabel("Device Status")
+
+                    // Status row
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        StatusDot(Warning)
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text("Inference engine", color = MainText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Coming in next milestone", color = MutedLight, fontSize = 12.sp)
                         }
-                        androidx.compose.material3.OutlinedButton(onClick = onOpenAgent) {
-                            Text("Open MCP workspace")
+                    }
+
+                    HorizontalDivider(color = Border)
+
+                    // Stats row
+                    Row(
+                        modifier              = Modifier.fillMaxWidth(),
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                installedCount.toString(),
+                                color      = Mint,
+                                fontSize   = 36.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                            Text("Local models", color = Muted, fontSize = 12.sp)
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = onOpenModels,
+                                colors  = ButtonDefaults.buttonColors(
+                                    containerColor = Mint,
+                                    contentColor   = Ink
+                                ),
+                                shape   = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Explore models", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+                            OutlinedButton(
+                                onClick = onOpenAgent,
+                                shape   = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Open workspace", fontSize = 13.sp)
+                            }
                         }
                     }
                 }
             }
         }
-        Text("BUILT FOR ON-DEVICE AI", color = Muted, fontSize = 10.sp, letterSpacing = 2.sp)
-        FeatureRow("01", "Choose your model", "Browse compact 1B–3B GGUF models.")
-        FeatureRow("02", "Keep it on-device", "Import or download models into app storage.")
-        FeatureRow("03", "Stay in control", "Remove model files whenever you want.")
-        Spacer(Modifier.weight(1f))
-        Text(notice, color = Muted, fontSize = 11.sp, modifier = Modifier.padding(bottom = 12.dp))
+
+        // Features
+        item { SectionLabel("How it works") }
+        item { FeatureCard("🧠", "Choose a model", "Browse compact 1B–3B GGUF models curated for mobile.") }
+        item { FeatureCard("📦", "Keep it on-device", "Import or download models directly into app storage.") }
+        item { FeatureCard("🔒", "Stay in control", "Remove any model file whenever you want. Full privacy.") }
+
+        item { Spacer(Modifier.height(4.dp)) }
     }
 }
 
 @Composable
-private fun FeatureRow(number: String, title: String, description: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(number, color = Mint, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.width(14.dp))
-        Column {
-            Text(title, color = MainText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            Text(description, color = Muted, fontSize = 11.sp)
+private fun FeatureCard(emoji: String, title: String, description: String) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Surface1),
+        shape  = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier          = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier         = Modifier
+                    .size(44.dp)
+                    .background(Surface2, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(emoji, fontSize = 20.sp)
+            }
+            Spacer(Modifier.width(14.dp))
+            Column {
+                Text(title, color = MainText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(description, color = MutedLight, fontSize = 12.sp, lineHeight = 17.sp)
+            }
         }
     }
 }
 
+// ── Models screen ─────────────────────────────────────────────────────────────
 @Composable
 private fun ModelsScreen(
     installed: List<File>,
@@ -339,61 +483,137 @@ private fun ModelsScreen(
     onImport: () -> Unit,
     onDelete: (String) -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp),
+    LazyColumn(
+        modifier            = Modifier.fillMaxSize(),
+        contentPadding      = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Model library", color = MainText, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-        Text("Download a model over Wi-Fi or import a GGUF file from your device.", color = Muted, fontSize = 12.sp)
-        OutlinedButton(onClick = onImport, enabled = !isBusy, modifier = Modifier.fillMaxWidth()) {
-            Text(if (isBusy) "Importing model…" else "＋  Import a .gguf file")
-        }
-        if (activeDownload != null) {
-            Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(16.dp)) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("DOWNLOADING · " + activeDownload.model.name, color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier.fillMaxWidth(),
-                        color = Mint,
-                        trackColor = Color(0xFF303B46)
-                    )
-                    Text((progress * 100).toInt().toString() + "% · " + formatBytes(downloadedBytes) + if (totalBytes > 0L) " / " + formatBytes(totalBytes) else " downloaded · size unknown", color = MainText, fontSize = 12.sp)
-                    Text(diagnostic, color = Muted, fontSize = 11.sp)
-                }
-            }
-        }
-        Text("CURATED MODELS", color = Muted, fontSize = 10.sp, letterSpacing = 2.sp)
-        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(ModelCatalog.models, key = { it.id }) { model ->
-                val localFile = installed.firstOrNull { it.name == model.fileName }
-                ModelCard(
-                    model = model,
-                    isInstalled = localFile != null,
-                    isDownloading = activeDownload?.model?.id == model.id,
-                    onDownload = { onDownload(model) },
-                    onDelete = { onDelete(model.fileName) }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Model Library", color = MainText, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "Download over Wi-Fi or import a GGUF file from your device.",
+                    color = MutedLight,
+                    fontSize = 13.sp
                 )
             }
-            val imported = installed.filter { file -> ModelCatalog.models.none { it.fileName == file.name } }
-            if (imported.isNotEmpty()) {
-                item {
-                    Text("IMPORTED MODEL FILES", color = Muted, fontSize = 10.sp, letterSpacing = 2.sp, modifier = Modifier.padding(top = 8.dp))
-                }
-                items(imported, key = { it.name }) { file ->
-                    Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(14.dp)) {
-                        Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(file.name, color = MainText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                                Text("Local GGUF · " + formatBytes(file.length()), color = Muted, fontSize = 10.sp)
-                            }
-                            TextButtonLike("Remove") { onDelete(file.name) }
-                        }
-                    }
+        }
+
+        // Import button
+        item {
+            FilledTonalButton(
+                onClick  = onImport,
+                enabled  = !isBusy,
+                modifier = Modifier.fillMaxWidth(),
+                shape    = RoundedCornerShape(12.dp),
+                colors   = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = Surface2,
+                    contentColor   = MainText
+                )
+            ) {
+                Text(
+                    if (isBusy) "⏳  Importing model…" else "＋  Import a .gguf file",
+                    fontSize   = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
+        // Active download card
+        if (activeDownload != null) {
+            item {
+                AnimatedVisibility(
+                    visible = true,
+                    enter   = fadeIn() + slideInVertically()
+                ) {
+                    DownloadProgressCard(
+                        name           = activeDownload.model.name,
+                        progress       = progress,
+                        downloadedBytes= downloadedBytes,
+                        totalBytes     = totalBytes,
+                        diagnostic     = diagnostic
+                    )
                 }
             }
         }
-        Text(notice, color = Muted, fontSize = 10.sp, modifier = Modifier.padding(bottom = 4.dp))
+
+        // Curated section header
+        item { SectionLabel("Curated Models") }
+
+        // Model cards
+        items(ModelCatalog.models, key = { it.id }) { model ->
+            val localFile = installed.firstOrNull { it.name == model.fileName }
+            ModelCard(
+                model         = model,
+                isInstalled   = localFile != null,
+                isDownloading = activeDownload?.model?.id == model.id,
+                onDownload    = { onDownload(model) },
+                onDelete      = { onDelete(model.fileName) }
+            )
+        }
+
+        // Imported models
+        val imported = installed.filter { file ->
+            ModelCatalog.models.none { it.fileName == file.name }
+        }
+        if (imported.isNotEmpty()) {
+            item { SectionLabel("Imported Files") }
+            items(imported, key = { it.name }) { file ->
+                ImportedFileCard(file, onDelete)
+            }
+        }
+
+        item { Spacer(Modifier.height(4.dp)) }
+    }
+}
+
+@Composable
+private fun DownloadProgressCard(
+    name: String,
+    progress: Float,
+    downloadedBytes: Long,
+    totalBytes: Long,
+    diagnostic: String
+) {
+    val animatedProgress by animateFloatAsState(targetValue = progress, label = "dlProgress")
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Surface1),
+        shape  = RoundedCornerShape(16.dp)
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StatusDot(Mint)
+                Spacer(Modifier.width(8.dp))
+                Text("Downloading", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Text(name, color = MainText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            LinearProgressIndicator(
+                progress    = { animatedProgress },
+                modifier    = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)),
+                color       = Mint,
+                trackColor  = Surface2,
+                strokeCap   = StrokeCap.Round
+            )
+            Row(
+                modifier              = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    formatBytes(downloadedBytes) +
+                        if (totalBytes > 0L) " / ${formatBytes(totalBytes)}" else " downloaded",
+                    color    = MainText,
+                    fontSize = 12.sp
+                )
+                Text(
+                    "${(progress * 100).toInt()}%",
+                    color      = Mint,
+                    fontSize   = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Text(diagnostic, color = Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
     }
 }
 
@@ -405,73 +625,215 @@ private fun ModelCard(
     onDownload: () -> Unit,
     onDelete: () -> Unit
 ) {
-    Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(model.name, color = MainText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Text(model.publisher, color = Muted, fontSize = 10.sp)
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Surface1),
+        shape  = RoundedCornerShape(18.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Header row
+            Row(verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(model.name, color = MainText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Text(model.publisher, color = Muted, fontSize = 11.sp)
                 }
-                Box(Modifier.background(Color(0xFF202B35), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 5.dp)) {
-                    Text(model.parameters, color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
+                Spacer(Modifier.width(8.dp))
+                Chip(model.parameters, Accent)
             }
-            Text(model.description, color = Muted, fontSize = 11.sp, lineHeight = 16.sp)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(model.quantization + " · " + model.sizeLabel, color = MainText, fontSize = 10.sp)
-                Spacer(Modifier.weight(1f))
-                if (isInstalled) {
-                    TextButtonLike("Remove", onDelete)
-                } else {
-                    Button(
-                        onClick = onDownload,
-                        enabled = !isDownloading,
-                        colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink),
-                        shape = RoundedCornerShape(10.dp)
+
+            // Description
+            Text(model.description, color = MutedLight, fontSize = 12.sp, lineHeight = 17.sp)
+
+            HorizontalDivider(color = Border)
+
+            // Footer row
+            Row(
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier              = Modifier.fillMaxWidth()
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(model.quantization, color = MutedLight, fontSize = 11.sp)
+                    Text(model.sizeLabel, color = Muted, fontSize = 11.sp)
+                }
+
+                when {
+                    isInstalled -> Row(
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(if (isDownloading) "Downloading…" else "Download", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("✓ On device", color = Success, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        OutlinedButton(
+                            onClick            = onDelete,
+                            shape              = RoundedCornerShape(10.dp),
+                            contentPadding     = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            colors             = ButtonDefaults.outlinedButtonColors(contentColor = Danger)
+                        ) {
+                            Text("Remove", fontSize = 11.sp)
+                        }
+                    }
+                    isDownloading -> FilledTonalButton(
+                        onClick  = {},
+                        enabled  = false,
+                        shape    = RoundedCornerShape(10.dp),
+                        colors   = ButtonDefaults.filledTonalButtonColors(containerColor = Surface2)
+                    ) {
+                        Text("Downloading…", fontSize = 11.sp, color = Muted)
+                    }
+                    else -> Button(
+                        onClick = onDownload,
+                        colors  = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink),
+                        shape   = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text("Download", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
-            if (isInstalled) Text("✓  Stored on this device", color = Mint, fontSize = 10.sp)
         }
     }
 }
 
 @Composable
-private fun TextButtonLike(label: String, onClick: () -> Unit) {
-    OutlinedButton(
-        onClick = onClick,
-        shape = RoundedCornerShape(9.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+private fun ImportedFileCard(file: File, onDelete: (String) -> Unit) {
+    Card(
+        colors   = CardDefaults.cardColors(containerColor = Surface1),
+        shape    = RoundedCornerShape(14.dp)
     ) {
-        Text(label, fontSize = 10.sp)
-    }
-}
-
-@Composable
-private fun SettingsScreen(notice: String) {
-    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("Settings", color = MainText, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-        InfoCard("PRIVACY", "Model files are stored in app-specific storage. V0.1 downloads models from Hugging Face; inference is not yet enabled.")
-        InfoCard("NETWORK", "Model downloads use unmetered Wi-Fi by default. No cloud inference endpoint is configured.")
-        InfoCard("RUNTIME", "llama.cpp Android integration is the next engineering milestone. Downloaded files are not loaded into memory in this version.")
-        InfoCard("VERSION", "NEXUS AI 0.1.0 · Android API 26+ · GGUF model manager")
-        Text(notice, color = Muted, fontSize = 11.sp)
-    }
-}
-
-@Composable
-private fun InfoCard(title: String, body: String) {
-    Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(16.dp)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Text(title, color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
-            Text(body, color = MainText, fontSize = 12.sp, lineHeight = 18.sp)
+        Row(
+            modifier          = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier         = Modifier
+                    .size(40.dp)
+                    .background(Surface2, RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("📁", fontSize = 18.sp)
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    file.name,
+                    color     = MainText,
+                    fontSize  = 13.sp,
+                    fontWeight= FontWeight.SemiBold,
+                    maxLines  = 1,
+                    overflow  = TextOverflow.Ellipsis
+                )
+                Text("GGUF · ${formatBytes(file.length())}", color = Muted, fontSize = 11.sp)
+            }
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(
+                onClick        = { onDelete(file.name) },
+                shape          = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                colors         = ButtonDefaults.outlinedButtonColors(contentColor = Danger)
+            ) {
+                Text("Remove", fontSize = 11.sp)
+            }
         }
     }
 }
 
-private fun formatBytes(bytes: Long): String {
-    if (bytes < 1_000_000_000L) return (bytes / 1_000_000L).toString() + " MB"
-    return String.format("%.2f GB", bytes / 1_000_000_000.0)
+// ── Settings screen ───────────────────────────────────────────────────────────
+@Composable
+private fun SettingsScreen() {
+    LazyColumn(
+        modifier            = Modifier.fillMaxSize(),
+        contentPadding      = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Text("Settings", color = MainText, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        }
+
+        item {
+            InfoCard(
+                emoji = "🔒",
+                title = "Privacy",
+                body  = "Models are stored in app-specific storage on your device. No data leaves your phone."
+            )
+        }
+        item {
+            InfoCard(
+                emoji = "📡",
+                title = "Network",
+                body  = "Downloads use unmetered Wi-Fi by default. No cloud inference endpoint is configured."
+            )
+        }
+        item {
+            InfoCard(
+                emoji = "⚙️",
+                title = "Runtime",
+                body  = "llama.cpp Android integration is the next milestone. Downloaded files are not loaded in this version."
+            )
+        }
+        item {
+            InfoCard(
+                emoji = "ℹ️",
+                title = "Version",
+                body  = "Nexus AI 0.2.0 · Android API 26+ · GGUF model manager"
+            )
+        }
+        item { Spacer(Modifier.height(8.dp)) }
+    }
 }
+
+// ── Shared components ─────────────────────────────────────────────────────────
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text.uppercase(),
+        color         = Muted,
+        fontSize      = 10.sp,
+        fontWeight    = FontWeight.SemiBold,
+        letterSpacing = 1.5.sp
+    )
+}
+
+@Composable
+private fun StatusDot(color: Color) {
+    Box(
+        modifier = Modifier
+            .size(8.dp)
+            .background(color, CircleShape)
+    )
+}
+
+@Composable
+private fun InfoCard(emoji: String, title: String, body: String) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Surface1),
+        shape  = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Box(
+                modifier         = Modifier
+                    .size(40.dp)
+                    .background(Surface2, RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(emoji, fontSize = 18.sp)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, color = MainText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(body, color = MutedLight, fontSize = 12.sp, lineHeight = 18.sp)
+            }
+        }
+    }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+private fun formatBytes(bytes: Long): String =
+    if (bytes < 1_000_000_000L) "${bytes / 1_000_000L} MB"
+    else "%.2f GB".format(bytes / 1_000_000_000.0)
+
+private fun Brush.Companion.linearGradientBrush(colors: List<Color>) =
+    linearGradient(colors)
