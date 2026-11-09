@@ -11,6 +11,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -246,9 +248,8 @@ private fun NexusChatApp(initialPath: String?) {
                 ) {
                     Surface(
                         onClick = { showModels = true },
-                        color = surface,
-                        shape = CircleShape,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, border)
+                        color = Color.Transparent,
+                        shape = CircleShape
                     ) {
                         Row(
                             Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
@@ -431,7 +432,7 @@ private fun NexusChatApp(initialPath: String?) {
                 contentColor = primaryText,
                 dragHandle = { BottomSheetHandle(border) }
             ) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp).padding(bottom = 28.dp)) {
+                Column(Modifier.fillMaxWidth().heightIn(max = 720.dp).verticalScroll(rememberScrollState()).padding(horizontal = 22.dp).padding(bottom = 28.dp)) {
                     Text("Models", color = primaryText, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(5.dp))
                     Text("Tap an installed model to use it.", color = mutedText, fontSize = 14.sp)
