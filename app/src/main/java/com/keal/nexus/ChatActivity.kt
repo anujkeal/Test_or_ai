@@ -196,7 +196,10 @@ private fun NexusChatApp(initialPath: String?) {
                     val model = downloadModel
                     val file = model?.let { ModelManager.modelFile(context, it) }
                     val expectedSha = model?.sha256
-                    val valid = file?.let { candidate -> expectedSha == null || withContext(Dispatchers.IO) { ModelManager.verifySha256(candidate, expectedSha) } } ?: false
+                    val valid = if (file != null && model != null) withContext(Dispatchers.IO) {
+                        ModelManager.isCompleteModelFile(file, model) &&
+                            (expectedSha == null || ModelManager.verifySha256(file, expectedSha))
+                    } else false
                     if (valid && file != null) {
                         installed = ModelManager.installedModels(context)
                         downloadStatus = "Ready to chat"
@@ -439,7 +442,9 @@ private fun NexusChatApp(initialPath: String?) {
                     Spacer(Modifier.height(14.dp))
                     HorizontalDivider(color = border)
                     ModelCatalog.models.forEach { model ->
-                        val file = installed.firstOrNull { it.name == model.fileName }
+                        val file = installed.firstOrNull {
+                            it.name == model.fileName && ModelManager.isCompleteModelFile(it, model)
+                        }
                         val selected = file?.absolutePath == modelPath
                         Row(
                             Modifier.fillMaxWidth().clickable(enabled = file != null) {
@@ -464,7 +469,7 @@ private fun NexusChatApp(initialPath: String?) {
                             if (selected) {
                                 Text("✓", color = NexusMint, fontSize = 26.sp, fontWeight = FontWeight.Bold)
                             } else if (file != null) {
-                                Text("✓", color = NexusMint, fontSize = 25.sp)
+                                Text("Use", color = NexusMint, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                             } else {
                                 Button(
                                     onClick = {
