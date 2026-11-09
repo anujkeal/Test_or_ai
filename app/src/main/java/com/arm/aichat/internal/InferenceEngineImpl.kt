@@ -118,6 +118,7 @@ internal class InferenceEngineImpl private constructor(
 
     private var _readyForSystemPrompt = false
     private var _systemPrompt: String? = null
+    @Volatile private var _nativeRuntimeLoaded = false
     @Volatile
     private var _cancelGeneration = false
 
@@ -138,6 +139,7 @@ internal class InferenceEngineImpl private constructor(
                 Log.i(TAG, "Loading native library...")
                 System.loadLibrary("ai-chat")
                 init(nativeLibDir)
+                _nativeRuntimeLoaded = true
                 _state.value = InferenceEngine.State.Initialized
                 Log.i(TAG, "Native library loaded! System info: \n${systemInfo()}")
 
@@ -330,11 +332,21 @@ internal class InferenceEngineImpl private constructor(
 
                 is InferenceEngine.State.Error -> {
                     Log.i(TAG, "Releasing partially loaded native resources...")
-                    unload()
-                    _systemPrompt = null
                     _readyForSystemPrompt = false
-                    _state.value = InferenceEngine.State.Initialized
-                    Log.i(TAG, "States reset!")
+                    if (!_nativeRuntimeLoaded) {
+                        // System.loadLibrary/init failed; JNI entry points may not exist.
+                        Log.w(TAG, "Native runtime never initialized; keeping the engine in Error.")
+                    } else {
+                        try {
+                            unload()
+                            _systemPrompt = null
+                            _state.value = InferenceEngine.State.Initialized
+                            Log.i(TAG, "States reset!")
+                        } catch (linkError: UnsatisfiedLinkError) {
+                            Log.e(TAG, "Native unload unavailable; keeping the engine in Error.", linkError)
+                            _state.value = InferenceEngine.State.Error(RuntimeException("Native runtime could not be unloaded safely.", linkError))
+                        }
+                    }
                     Unit
                 }
 
