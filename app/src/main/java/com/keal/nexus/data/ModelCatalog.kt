@@ -16,6 +16,18 @@ data class ModelSpec(
 object ModelCatalog {
     val models = listOf(
         ModelSpec(
+            id = "llama-3.2-3b-q4",
+            name = "Llama 3.2 3B Instruct",
+            publisher = "Meta · GGUF by bartowski",
+            parameters = "3B",
+            quantization = "Q4_K_M",
+            sizeLabel = "~2.02 GB",
+            fileName = "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+            downloadUrl = "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+            sha256 = "6c1a2b41161032677be168d354123594c0e6e67d2b9227c84f296ad037c728ff",
+            description = "3B instruction model. NEXUS verifies the downloaded file with SHA-256 before making it available."
+        ),
+        ModelSpec(
             id = "llama-3.2-1b-q4",
             name = "Llama 3.2 1B Instruct",
             publisher = "Meta · GGUF by bartowski",
