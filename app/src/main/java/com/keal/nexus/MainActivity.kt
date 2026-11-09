@@ -358,7 +358,8 @@ private fun ModelsScreen(
                         color = Mint,
                         trackColor = Color(0xFF303B46)
                     )
-                    Text((progress * 100).toInt().toString() + "% · " + activeDownload.model.sizeLabel, color = Muted, fontSize = 11.sp)
+                    Text((progress * 100).toInt().toString() + "% · " + formatBytes(downloadedBytes) + if (totalBytes > 0L) " / " + formatBytes(totalBytes) else " downloaded · size unknown", color = MainText, fontSize = 12.sp)
+                    Text(diagnostic, color = Muted, fontSize = 11.sp)
                 }
             }
         }
