@@ -158,7 +158,7 @@ private fun NexusApp() {
                 }
                 result.onSuccess {
                     installed = ModelManager.installedModels(context)
-                    showNotice("Imported ${it.name}")
+                    showNotice("GGUF file verified and imported: ${it.name} · ${formatBytes(it.length())}. Model is not loaded yet.")
                 }.onFailure {
                     showNotice(it.message ?: "Could not import model.")
                 }
@@ -724,7 +724,7 @@ private fun ImportedFileCard(file: File, onDelete: (String) -> Unit) {
                     maxLines  = 1,
                     overflow  = TextOverflow.Ellipsis
                 )
-                Text("GGUF · ${formatBytes(file.length())}", color = Muted, fontSize = 11.sp)
+                Text("GGUF header verified · ${formatBytes(file.length())} · Not loaded", color = Muted, fontSize = 11.sp)
             }
             Spacer(Modifier.width(8.dp))
             OutlinedButton(
