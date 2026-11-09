@@ -9,35 +9,30 @@ class McpToolRegistry(private val workspace: WorkspaceStore) {
         put(tool("workspace.list_files", "List files in the user-selected workspace folder.", JSONObject()))
         put(tool("workspace.read_file", "Read a UTF-8 text file from the workspace. Maximum 1 MB.",
             objectSchema("name" to stringProperty("File name directly inside the workspace."))))
-        put(tool("workspace.write_file", "Create or replace a UTF-8 text file in the workspace. Maximum 1 MB. Set overwrite_confirmed=true only after user approval when replacing an existing file.",
+        put(tool("workspace.write_file", "Create or replace a UTF-8 text file in the workspace. Maximum 1 MB. Replacing an existing file requires host-side user approval.",
             objectSchema(
                 "name" to stringProperty("File name directly inside the workspace."),
-                "content" to stringProperty("Complete file contents."),
-                "overwrite_confirmed" to booleanProperty("Explicit user approval to replace an existing file.")
+                "content" to stringProperty("Complete file contents.")
             )))
-        put(tool("workspace.delete_file", "Delete a file from the workspace. Requires confirmed=true after explicit user approval.",
-            objectSchema(
-                "name" to stringProperty("File name directly inside the workspace."),
-                "confirmed" to booleanProperty("Explicit user approval to delete this file.")
-            )))
+        put(tool("workspace.delete_file", "Delete a file from the workspace. Requires host-side user approval.",
+            objectSchema("name" to stringProperty("File name directly inside the workspace."))))
     }
 
-    fun callTool(name: String, arguments: JSONObject): JSONObject {
+    /** userApproved must come from a trusted app UI confirmation, never from model arguments. */
+    fun callTool(name: String, arguments: JSONObject, userApproved: Boolean = false): JSONObject {
         return try {
             val result = when (name) {
                 "workspace.list_files" -> workspace.listFiles().joinToString("\n").ifBlank { "Workspace is empty." }
                 "workspace.read_file" -> workspace.readFile(arguments.getString("name"))
                 "workspace.write_file" -> {
                     val fileName = arguments.getString("name")
-                    if (workspace.fileExists(fileName) && !arguments.optBoolean("overwrite_confirmed")) {
-                        throw SecurityException("This file already exists. Ask the user to approve overwriting it.")
+                    if (workspace.fileExists(fileName) && !userApproved) {
+                        throw SecurityException("Approval required: ask the user before replacing this file.")
                     }
                     "Saved " + workspace.writeFile(fileName, arguments.getString("content"))
                 }
                 "workspace.delete_file" -> {
-                    if (!arguments.optBoolean("confirmed")) {
-                        throw SecurityException("Deletion requires explicit user confirmation.")
-                    }
+                    if (!userApproved) throw SecurityException("Approval required: ask the user before deleting this file.")
                     if (workspace.deleteFile(arguments.getString("name"))) "Deleted " + arguments.getString("name")
                     else "File not found."
                 }
@@ -78,9 +73,6 @@ class McpToolRegistry(private val workspace: WorkspaceStore) {
 
     private fun stringProperty(description: String) =
         JSONObject().put("type", "string").put("description", description)
-
-    private fun booleanProperty(description: String) =
-        JSONObject().put("type", "boolean").put("description", description)
 
     private fun toolResult(message: String, isError: Boolean) =
         JSONObject().put("content", JSONArray().put(JSONObject().put("type", "text").put("text", message)))

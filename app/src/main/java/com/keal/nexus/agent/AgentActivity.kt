@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -57,6 +58,7 @@ main{max-width:640px;margin:8vh auto}h1{color:#b8f2d0}p{color:#aab7c5;line-heigh
     var status by remember { mutableStateOf("Choose a folder to grant NEXUS access to that workspace.") }
     var previewHtml by remember { mutableStateOf<String?>(null) }
     var files by remember { mutableStateOf(emptyList<String>()) }
+    var showOverwriteDialog by remember { mutableStateOf(false) }
 
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -68,6 +70,26 @@ main{max-width:640px;margin:8vh auto}h1{color:#b8f2d0}p{color:#aab7c5;line-heigh
                 }
                 .onFailure { status = it.message ?: "Could not access that folder." }
         }
+    }
+
+    if (showOverwriteDialog) {
+        AlertDialog(
+            onDismissRequest = { showOverwriteDialog = false },
+            title = { Text("Replace existing file?") },
+            text = { Text("This will overwrite $fileName in the selected workspace folder.") },
+            confirmButton = {
+                Button(onClick = {
+                    showOverwriteDialog = false
+                    val result = tools.callTool("workspace.write_file",
+                        JSONObject().put("name", fileName).put("content", source), userApproved = true)
+                    status = result.optJSONArray("content")?.optJSONObject(0)?.optString("text") ?: "Tool call finished."
+                    files = runCatching { workspace.listFiles() }.getOrDefault(files)
+                }) { Text("Replace file") }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showOverwriteDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -90,10 +112,14 @@ main{max-width:640px;margin:8vh auto}h1{color:#b8f2d0}p{color:#aab7c5;line-heigh
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = {
-                        val result = tools.callTool("workspace.write_file",
-                            JSONObject().put("name", fileName).put("content", source).put("overwrite_confirmed", true))
-                        status = result.optJSONArray("content")?.optJSONObject(0)?.optString("text") ?: "Tool call finished."
-                        files = runCatching { workspace.listFiles() }.getOrDefault(files)
+                        if (runCatching { workspace.fileExists(fileName) }.getOrDefault(false)) {
+                            showOverwriteDialog = true
+                        } else {
+                            val result = tools.callTool("workspace.write_file",
+                                JSONObject().put("name", fileName).put("content", source))
+                            status = result.optJSONArray("content")?.optJSONObject(0)?.optString("text") ?: "Tool call finished."
+                            files = runCatching { workspace.listFiles() }.getOrDefault(files)
+                        }
                     },
                     enabled = workspace.selectedTreeUri() != null,
                     modifier = Modifier.weight(1f)

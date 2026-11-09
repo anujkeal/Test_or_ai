@@ -42,8 +42,8 @@ GitHub Actions builds the debug APK on pushes to main and manual dispatches, the
 - File operations are restricted to files directly inside that folder; path traversal and nested paths are rejected.
 - Text file tools have a 1 MB size limit.
 - HTML preview runs in a WebView with file/content access disabled and no native JavaScript bridge.
-- Deleting files and overwriting existing files require confirmation before the future model tool loop executes them.
-- This milestone does not provide arbitrary shell access or unrestricted device control.
+- The app asks for confirmation before overwriting an existing file. MCP JSON-RPC calls cannot self-approve overwrites or deletion; only trusted host UI code can pass the approval flag. A delete confirmation UI is still to be added.
+- This milestone does not provide arbitrary shell access, general Python execution, remote MCP server connections, or unrestricted device control. HTML and its JavaScript can be previewed inside the app's WebView.
 
 ## Architecture
 
