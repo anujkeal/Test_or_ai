@@ -122,7 +122,7 @@ object ModelManager {
     fun isCompleteModelFile(file: File, model: ModelSpec): Boolean {
         if (!file.isFile || !file.name.equals(model.fileName, ignoreCase = true)) return false
         if (!hasGgufMagic(file)) return false
-        val size = Regex("""([0-9]+(?:\\.[0-9]+)?)\\s*GB""", RegexOption.IGNORE_CASE)
+        val size = Regex("""([0-9]+(?:\.[0-9]+)?)\s*GB""", RegexOption.IGNORE_CASE)
             .find(model.sizeLabel)?.groupValues?.get(1)?.toDoubleOrNull() ?: return false
         val expectedBytes = (size * 1_000_000_000.0).toLong()
         return file.length() >= (expectedBytes * 0.90).toLong()
