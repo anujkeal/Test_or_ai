@@ -13,10 +13,15 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 2
-        versionName = "0.2.0"
+        versionName = "0.3.0"
+        ndk { abiFilters += listOf("arm64-v8a") }
+        externalNativeBuild { cmake { cppFlags += "-std=c++17"; arguments += "-DCMAKE_BUILD_TYPE=Release" } }
     }
 
     buildFeatures { compose = true }
+
+    ndkVersion = "29.0.13113456"
+    externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.31.6" } }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -41,5 +46,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
