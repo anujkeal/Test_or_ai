@@ -278,8 +278,7 @@ private fun NexusChatApp(initialPath: String?) {
                         DropdownMenu(
                             expanded = showMenu,
                             onDismissRequest = { showMenu = false },
-                            containerColor = surface,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, border)
+                            containerColor = surface
                         ) {
                             MenuEntry("＋", "New chat") {
                                 messages.clear(); input = ""; loadError = null; showMenu = false
