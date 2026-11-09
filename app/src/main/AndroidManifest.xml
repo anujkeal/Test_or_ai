@@ -8,6 +8,7 @@
         android:theme="@style/Theme.Nexus"
         android:usesCleartextTraffic="false">
         <activity android:name=".agent.AgentActivity" android:exported="false" />
+        <activity android:name=".ChatActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
