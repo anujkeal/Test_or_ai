@@ -117,6 +117,7 @@ internal class InferenceEngineImpl private constructor(
     override val state: StateFlow<InferenceEngine.State> = _state.asStateFlow()
 
     private var _readyForSystemPrompt = false
+    private var _systemPrompt: String? = null
     @Volatile
     private var _cancelGeneration = false
 
@@ -205,6 +206,7 @@ internal class InferenceEngineImpl private constructor(
             }
 
             Log.i(TAG, "Sending system prompt...")
+            _systemPrompt = prompt
             _readyForSystemPrompt = false
             _state.value = InferenceEngine.State.ProcessingSystemPrompt
             processSystemPrompt(prompt).let { result ->
@@ -239,7 +241,10 @@ internal class InferenceEngineImpl private constructor(
             processUserPrompt(message, predictLength).let { result ->
                 if (result != 0) {
                     Log.e(TAG, "Failed to process user prompt: $result")
-                    return@flow
+                    val resetResult = processSystemPrompt(_systemPrompt ?: "You are NEXUS, a helpful on-device AI assistant.")
+                    if (resetResult == 0) _state.value = InferenceEngine.State.ModelReady
+                    else throw IOException("Prompt failed ($result) and conversation reset failed ($resetResult).")
+                    throw IOException("Could not process your message. The conversation was reset; please try again.")
                 }
             }
 
@@ -262,7 +267,7 @@ internal class InferenceEngineImpl private constructor(
             throw e
         } catch (e: Exception) {
             Log.e(TAG, "Error during generation!", e)
-            _state.value = InferenceEngine.State.Error(e)
+            if (_state.value !is InferenceEngine.State.ModelReady) _state.value = InferenceEngine.State.Error(e)
             throw e
         }
     }.flowOn(llamaDispatcher)
@@ -296,6 +301,7 @@ internal class InferenceEngineImpl private constructor(
                     _state.value = InferenceEngine.State.UnloadingModel
 
                     unload()
+                    _systemPrompt = null
 
                     _state.value = InferenceEngine.State.Initialized
                     Log.i(TAG, "Model unloaded!")
@@ -303,7 +309,10 @@ internal class InferenceEngineImpl private constructor(
                 }
 
                 is InferenceEngine.State.Error -> {
-                    Log.i(TAG, "Resetting error states...")
+                    Log.i(TAG, "Releasing partially loaded native resources...")
+                    unload()
+                    _systemPrompt = null
+                    _readyForSystemPrompt = false
                     _state.value = InferenceEngine.State.Initialized
                     Log.i(TAG, "States reset!")
                     Unit
