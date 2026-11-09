@@ -23,7 +23,8 @@
 #endif
 
 static inline int ai_should_log(int prio) {
-    return __android_log_is_loggable(prio, LOG_TAG, LOG_MIN_LEVEL);
+    // __android_log_is_loggable() is API 30+. Keep API 26 compatibility.
+    return prio >= LOG_MIN_LEVEL;
 }
 
 #if LOG_MIN_LEVEL <= ANDROID_LOG_VERBOSE
