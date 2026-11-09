@@ -12,6 +12,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,6 +64,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -311,18 +313,11 @@ private fun TopHeader() {
             .padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Logo
-        Box(
-            modifier          = Modifier
-                .size(40.dp)
-                .background(
-                    brush  = Brush.linearGradientBrush(listOf(Mint, Accent)),
-                    shape  = RoundedCornerShape(12.dp)
-                ),
-            contentAlignment  = Alignment.Center
-        ) {
-            Text("N", color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Black)
-        }
+        Image(
+            painter = painterResource(id = R.drawable.nexus_logo),
+            contentDescription = "NEXUS AI logo",
+            modifier = Modifier.size(48.dp)
+        )
         Spacer(Modifier.width(12.dp))
         Column {
             Text("Nexus AI", color = MainText, fontWeight = FontWeight.Bold, fontSize = 16.sp)
