@@ -633,7 +633,7 @@ private fun NexusChatApp(initialPath: String?) {
                     }
                     HorizontalDivider(color = border)
                     Spacer(Modifier.height(18.dp))
-                    Text("NEXUS AI 0.7.0 · Everything stays on your device.\nNo cloud, no tracking.", color = mutedText, fontSize = 14.sp, lineHeight = 21.sp)
+                    Text("NEXUS AI ${BuildConfig.VERSION_NAME} · Everything stays on your device.\nNo cloud, no tracking.", color = mutedText, fontSize = 14.sp, lineHeight = 21.sp)
                 }
             }
         }
