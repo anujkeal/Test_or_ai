@@ -81,11 +81,12 @@ private fun NexusChatApp(initialPath: String?) {
             NexusThemeMode.valueOf(prefs.getString("theme", "SYSTEM") ?: "SYSTEM")
         }.getOrDefault(NexusThemeMode.SYSTEM))
     }
-    var wifiOnly by remember { mutableStateOf(prefs.getBoolean("wifi_only", true)) }
+    var wifiOnly by remember { mutableStateOf(prefs.getBoolean("wifi_only", false)) }
     var modelPath by remember { mutableStateOf(initialPath) }
     var engine by remember { mutableStateOf<InferenceEngine?>(null) }
     var ready by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
+    var loadAttempt by remember { mutableIntStateOf(0) }
     var loadError by remember { mutableStateOf<String?>(null) }
     var loadStage by remember { mutableStateOf("Preparing model") }
     var input by remember { mutableStateOf("") }
@@ -138,7 +139,7 @@ private fun NexusChatApp(initialPath: String?) {
         }
     }
 
-    LaunchedEffect(modelPath) {
+    LaunchedEffect(modelPath, loadAttempt) {
         prefs.edit().putString("last_model_path", modelPath).apply()
         val path = modelPath
         ready = false
@@ -212,6 +213,13 @@ private fun NexusChatApp(initialPath: String?) {
                 }
                 else -> delay(700)
             }
+        }
+    }
+
+    LaunchedEffect(downloadStatus) {
+        if (downloadStatus != null) {
+            delay(3200)
+            downloadStatus = null
         }
     }
 
@@ -319,7 +327,7 @@ private fun NexusChatApp(initialPath: String?) {
                                         Spacer(Modifier.height(6.dp))
                                         Text(loadError!!, color = primaryText, fontSize = 12.sp)
                                         Spacer(Modifier.height(8.dp))
-                                        TextButton(onClick = { modelPath = modelPath }) { Text("Try again") }
+                                        TextButton(onClick = { loadAttempt++ }) { Text("Try again") }
                                     }
                                 }
                             }
@@ -434,7 +442,8 @@ private fun NexusChatApp(initialPath: String?) {
                         val selected = file?.absolutePath == modelPath
                         Row(
                             Modifier.fillMaxWidth().clickable(enabled = file != null) {
-                                modelPath = file!!.absolutePath
+                                if (file!!.absolutePath != modelPath) messages.clear()
+                                modelPath = file.absolutePath
                                 showModels = false
                             }.padding(vertical = 16.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -495,7 +504,7 @@ private fun NexusChatApp(initialPath: String?) {
                     val imported = installed.filter { file -> ModelCatalog.models.none { it.fileName == file.name } }
                     imported.forEach { file ->
                         Row(
-                            Modifier.fillMaxWidth().clickable { modelPath = file.absolutePath; showModels = false }.padding(vertical = 12.dp),
+                            Modifier.fillMaxWidth().clickable { if (file.absolutePath != modelPath) messages.clear(); modelPath = file.absolutePath; showModels = false }.padding(vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(Modifier.weight(1f)) {
@@ -568,7 +577,7 @@ private fun NexusChatApp(initialPath: String?) {
                     }
                     HorizontalDivider(color = border)
                     Spacer(Modifier.height(18.dp))
-                    Text("NEXUS AI 0.5.0 · Everything stays on your device.\nNo cloud, no tracking.", color = mutedText, fontSize = 14.sp, lineHeight = 21.sp)
+                    Text("NEXUS AI 0.6.0 · Everything stays on your device.\nNo cloud, no tracking.", color = mutedText, fontSize = 14.sp, lineHeight = 21.sp)
                 }
             }
         }
