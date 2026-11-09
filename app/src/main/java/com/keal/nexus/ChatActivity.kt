@@ -105,6 +105,10 @@ private fun NexusChatApp(initialPath: String?) {
     var downloadModel by remember { mutableStateOf(ModelCatalog.models.firstOrNull { it.id == prefs.getString("active_download_model_id", null) }) }
     var downloadProgress by remember { mutableFloatStateOf(0f) }
     var downloadStatus by remember { mutableStateOf<String?>(null) }
+    var importingModel by remember { mutableStateOf(false) }
+    var importProgress by remember { mutableFloatStateOf(0f) }
+    var importProgressKnown by remember { mutableStateOf(false) }
+    var importError by remember { mutableStateOf<String?>(null) }
     var installed by remember { mutableStateOf(ModelManager.installedModels(context)) }
     val messages = remember { mutableStateListOf<ChatMessage>() }
     val listState = rememberLazyListState()
@@ -134,15 +138,34 @@ private fun NexusChatApp(initialPath: String?) {
     }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) scope.launch {
-            runCatching { withContext(Dispatchers.IO) { ModelManager.importModel(context, uri) } }
-                .onSuccess { file ->
+        if (uri != null && !importingModel) {
+            importingModel = true
+            importProgress = 0f
+            importProgressKnown = false
+            importError = null
+            scope.launch {
+                try {
+                    val file = withContext(Dispatchers.IO) {
+                        ModelManager.importModel(context, uri) { copiedBytes, totalBytes ->
+                            scope.launch {
+                                importProgressKnown = totalBytes > 0L
+                                importProgress = if (totalBytes > 0L) {
+                                    (copiedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+                                } else 0f
+                            }
+                        }
+                    }
                     installed = ModelManager.installedModels(context)
-                    showModels = false
                     modelPath = file.absolutePath
+                    showModels = false
                     downloadStatus = "Imported ${file.name}"
+                } catch (t: Throwable) {
+                    importError = t.message ?: "Could not import model."
+                    downloadStatus = "Import failed: ${importError}"
+                } finally {
+                    importingModel = false
                 }
-                .onFailure { downloadStatus = it.message ?: "Could not import model." }
+            }
         }
     }
 
@@ -494,7 +517,8 @@ private fun NexusChatApp(initialPath: String?) {
                         val file = installed.firstOrNull {
                             it.name == model.fileName && ModelManager.isCompleteModelFile(it, model)
                         }
-                        val selected = file?.absolutePath == modelPath
+                        // A missing file and a null modelPath must never look selected.
+                        val selected = file != null && file.absolutePath == modelPath
                         Row(
                             Modifier.fillMaxWidth().clickable(enabled = file != null && !generating && !loading) {
                                 file?.let { selectedFile ->
@@ -546,12 +570,58 @@ private fun NexusChatApp(initialPath: String?) {
                     }
                     Spacer(Modifier.height(10.dp))
                     Row(
-                        Modifier.fillMaxWidth().clickable { importLauncher.launch(arrayOf("*/*")) }.padding(vertical = 12.dp),
+                        Modifier.fillMaxWidth().clickable(enabled = !importingModel) {
+                            importLauncher.launch(arrayOf("*/*"))
+                        }.padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("＋", color = NexusMint, fontSize = 28.sp)
+                        if (importingModel) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(25.dp),
+                                color = NexusMint,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("＋", color = NexusMint, fontSize = 28.sp)
+                        }
                         Spacer(Modifier.width(14.dp))
-                        Text("Import a .gguf file", color = primaryText, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                if (importingModel) "Adding GGUF model…" else "Import a .gguf file",
+                                color = primaryText,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            if (importingModel) {
+                                Spacer(Modifier.height(8.dp))
+                                if (importProgressKnown) {
+                                    LinearProgressIndicator(
+                                        progress = { importProgress },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        color = NexusMint
+                                    )
+                                    Text(
+                                        "${(importProgress * 100).toInt()}% copied",
+                                        color = mutedText,
+                                        fontSize = 12.sp
+                                    )
+                                } else {
+                                    LinearProgressIndicator(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        color = NexusMint
+                                    )
+                                    Text("Copying and validating file…", color = mutedText, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                    if (importError != null) {
+                        Text(
+                            "Import failed: ${importError}",
+                            color = Color(0xFFE36B79),
+                            fontSize = 13.sp,
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+                        )
                     }
                     val imported = installed.filter { file -> ModelCatalog.models.none { it.fileName == file.name } }
                     imported.forEach { file ->
