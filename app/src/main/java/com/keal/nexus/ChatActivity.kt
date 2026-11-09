@@ -3,6 +3,7 @@ package com.keal.nexus
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -129,7 +131,12 @@ private fun ChatScreen(modelPath: String, onEngine: (InferenceEngine) -> Unit, o
             TextButton(onClick = onBack, contentPadding = PaddingValues(horizontal = 8.dp)) {
                 Text("‹  Back", color = NexusMint, fontSize = 15.sp)
             }
-            Column(Modifier.weight(1f).padding(start = 8.dp)) {
+            Image(
+                painter = painterResource(id = R.drawable.nexus_logo),
+                contentDescription = "NEXUS AI logo",
+                modifier = Modifier.size(34.dp)
+            )
+            Column(Modifier.weight(1f).padding(start = 10.dp)) {
                 Text("NEXUS AI", color = NexusText, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
                 Text(File(modelPath).name, color = NexusMuted, fontSize = 10.sp, maxLines = 1)
             }
