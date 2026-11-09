@@ -68,6 +68,7 @@ private fun ChatScreen(
     onBack: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
     val messages = remember { mutableStateListOf<ChatMessage>() }
     var engine by remember { mutableStateOf<InferenceEngine?>(null) }
     var input by remember { mutableStateOf("") }
@@ -80,7 +81,7 @@ private fun ChatScreen(
     LaunchedEffect(modelPath) {
         try {
             val local = withContext(Dispatchers.Default) {
-                AiChat.getInferenceEngine(androidx.compose.ui.platform.LocalContext.current)
+                AiChat.getInferenceEngine(context)
             }
             engine = local
             onEngine(local)
