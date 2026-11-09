@@ -17,8 +17,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,7 +26,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arm.aichat.AiChat
@@ -142,6 +139,7 @@ private fun NexusChatApp(initialPath: String?) {
     }
 
     LaunchedEffect(modelPath) {
+        prefs.edit().putString("last_model_path", modelPath).apply()
         val path = modelPath
         ready = false
         loadError = null
@@ -367,8 +365,6 @@ private fun NexusChatApp(initialPath: String?) {
                         placeholder = { Text(if (ready) "Message NEXUS" else "Choose a model to start", color = mutedText, fontSize = 16.sp) },
                         maxLines = 5,
                         shape = CircleShape,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                        keyboardActions = KeyboardActions(onSend = { if (ready && !generating) submitPrompt(input, messages, { input = "" }, { generating = true }, scope, engine) }),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = primaryText, unfocusedTextColor = primaryText,
                             focusedBorderColor = border, unfocusedBorderColor = border,
