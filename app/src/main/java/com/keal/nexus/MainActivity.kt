@@ -15,7 +15,12 @@ class MainActivity : ComponentActivity() {
         val installed = ModelManager.installedModels(this)
         val preferences = getSharedPreferences("nexus_preferences", MODE_PRIVATE)
         val lastPath = preferences.getString("last_model_path", null)
-        val selected = installed.firstOrNull { it.absolutePath == lastPath } ?: installed.firstOrNull()
+        val selected = installed.firstOrNull { file ->
+            file.absolutePath == lastPath &&
+                (com.keal.nexus.data.ModelCatalog.models.firstOrNull { it.fileName == file.name }
+                    ?.let { model -> ModelManager.isCompleteModelFile(file, model) }
+                    ?: (file.length() >= 64L * 1024L * 1024L && ModelManager.hasGgufMagic(file)))
+        }
         val intent = Intent(this, ChatActivity::class.java)
         selected?.let { intent.putExtra(ChatActivity.EXTRA_MODEL_PATH, it.absolutePath) }
         startActivity(intent)
