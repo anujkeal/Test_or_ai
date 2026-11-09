@@ -106,6 +106,9 @@ private fun NexusApp() {
     var installed by remember { mutableStateOf(ModelManager.installedModels(context)) }
     var activeDownload by remember { mutableStateOf<ActiveDownload?>(null) }
     var downloadProgress by remember { mutableFloatStateOf(0f) }
+    var downloadedBytes by remember { mutableLongStateOf(0L) }
+    var totalDownloadBytes by remember { mutableLongStateOf(-1L) }
+    var downloadDiagnostic by remember { mutableStateOf("Waiting for Android Download Manager…") }
     var notice by remember { mutableStateOf("Your models stay on this device.") }
     var isBusy by remember { mutableStateOf(false) }
 
@@ -141,6 +144,9 @@ private fun NexusApp() {
                 break
             }
             downloadProgress = snapshot.progress.coerceIn(0f, 1f)
+            downloadedBytes = snapshot.downloadedBytes.coerceAtLeast(0L)
+            totalDownloadBytes = snapshot.totalBytes
+            downloadDiagnostic = "Android status " + snapshot.status + " · reason " + snapshot.reason
             when (snapshot.status) {
                 DownloadManager.STATUS_SUCCESSFUL -> {
                     val file = ModelManager.modelFile(context, current.model)
