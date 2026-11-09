@@ -4,6 +4,7 @@
 #include <cmath>
 #include <string>
 #include <unistd.h>
+#include <mutex>
 #include <sampling.h>
 
 #include "logging.h"
@@ -38,12 +39,23 @@ static llama_context                    * g_context;
 static common_batch                       g_batch;
 static common_chat_templates_ptr          g_chat_templates;
 static common_sampler                   * g_sampler;
+static std::mutex g_error_mutex;
+static std::string g_last_model_error;
+
+static void nexus_log_callback(enum ggml_log_level level, const char * text, void * user_data) {
+    aichat_android_log_callback(level, text, user_data);
+    if (level == GGML_LOG_LEVEL_ERROR || level == GGML_LOG_LEVEL_WARN) {
+        std::lock_guard<std::mutex> lock(g_error_mutex);
+        g_last_model_error.append(text ? text : "");
+        if (g_last_model_error.size() > 12000) g_last_model_error.erase(0, g_last_model_error.size() - 12000);
+    }
+}
 
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_arm_aichat_internal_InferenceEngineImpl_init(JNIEnv *env, jobject /*unused*/, jstring nativeLibDir) {
     // Set llama log handler to Android
-    llama_log_set(aichat_android_log_callback, nullptr);
+    llama_log_set(nexus_log_callback, nullptr);
 
     // Loading all CPU backend variants
     const auto *path_to_backend = env->GetStringUTFChars(nativeLibDir, 0);
@@ -60,6 +72,10 @@ extern "C"
 JNIEXPORT jint JNICALL
 Java_com_arm_aichat_internal_InferenceEngineImpl_load(JNIEnv *env, jobject, jstring jmodel_path) {
     llama_model_params model_params = llama_model_default_params();
+    {
+        std::lock_guard<std::mutex> lock(g_error_mutex);
+        g_last_model_error.clear();
+    }
 
     const auto *model_path = env->GetStringUTFChars(jmodel_path, 0);
     LOGd("%s: Loading model from: \n%s\n", __func__, model_path);
@@ -67,6 +83,8 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_load(JNIEnv *env, jobject, jstr
     auto *model = llama_model_load_from_file(model_path, model_params);
     env->ReleaseStringUTFChars(jmodel_path, model_path);
     if (!model) {
+        std::lock_guard<std::mutex> lock(g_error_mutex);
+        if (g_last_model_error.empty()) g_last_model_error = "llama.cpp returned null while opening the GGUF file. Check file integrity and GGUF compatibility.";
         return 1;
     }
     g_model = model;
@@ -108,6 +126,13 @@ static common_sampler *new_sampler(float temp) {
     common_params_sampling sparams;
     sparams.temp = temp;
     return common_sampler_init(g_model, sparams);
+}
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_arm_aichat_internal_InferenceEngineImpl_nativeLastError(JNIEnv *env, jobject) {
+    std::lock_guard<std::mutex> lock(g_error_mutex);
+    return env->NewStringUTF(g_last_model_error.c_str());
 }
 
 extern "C"
