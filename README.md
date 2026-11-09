@@ -2,19 +2,21 @@
 
 **Your AI. Your device. Your data.**
 
-NEXUS AI is an Android-first, offline-first local AI app. V0.1 establishes the model-management foundation: discover, download, import, and manage quantized GGUF language models on-device.
+NEXUS AI is an Android-first local AI project. The current source establishes a GGUF model manager and an MCP-compatible, permission-scoped workspace tool foundation.
 
-## V0.1 — Model Manager
+## V0.2 — MCP Workspace Foundation
 
 - Kotlin + Jetpack Compose Android app
-- Curated GGUF catalogue: Llama 3.2 1B, Qwen2.5 1.5B, and Qwen2.5 3B
-- In-app downloads through Android DownloadManager
-- Download progress and failure reporting
-- Import existing GGUF files through Android's document picker
-- App-specific model storage and model deletion
-- SHA-256 verification for catalogue entries with pinned checksums
+- Curated GGUF catalogue: Llama 3.2 1B, Qwen2.5 1.5B, Qwen2.5 3B
+- Model downloads through Android DownloadManager
+- Import GGUF files through Android's Storage Access Framework
+- App-specific model storage and deletion
+- User-selected workspace folder through Android's Storage Access Framework
+- MCP JSON-RPC core methods: initialize, ping, tools/list, tools/call
+- Workspace tools: list, read, write, and delete files
+- Local HTML preview in a WebView without a native JavaScript bridge
 
-**Honest milestone boundary:** V0.1 does not generate AI responses yet. The llama.cpp native inference runtime and offline chat are the next milestone. RAG, MCP tools, identity, guardrails, caching, observability, and evaluations follow after inference works.
+**Honest milestone boundary:** the MCP workspace registry is currently an in-process MCP-compatible tool layer. It is not yet connected to the local model's generation loop and is not an external network MCP server. The app cannot yet autonomously decide which tools to call. The next milestone connects llama.cpp inference to this registry with approval gates for destructive and externally visible actions.
 
 ## Build requirements
 
@@ -24,55 +26,48 @@ NEXUS AI is an Android-first, offline-first local AI app. V0.1 establishes the m
 - Android Gradle Plugin 8.7.3
 - Gradle 8.9
 
-Open the repository in Android Studio and sync Gradle. Alternatively, run Gradle 8.9 on a machine with the Android SDK installed:
+Open the repository in Android Studio and sync Gradle, or run:
 
     gradle :app:assembleDebug
 
-The debug APK is generated at:
+Debug APK output:
 
     app/build/outputs/apk/debug/app-debug.apk
 
-The Android GitHub Actions workflow builds the debug APK on pushes to main and manual dispatches, then uploads it as an artifact.
+GitHub Actions builds the debug APK on pushes to main and manual dispatches, then uploads it as an artifact.
 
-## Model catalogue
+## MCP workspace security
 
-| Model | Quantization | Approx. size |
-|---|---|---:|
-| Llama 3.2 1B Instruct | Q4_K_M | 0.81 GB |
-| Qwen2.5 1.5B Instruct | Q4_K_M | 0.99 GB |
-| Qwen2.5 3B Instruct | Q4_K_M | 1.93 GB |
-
-Model files are hosted by third parties on Hugging Face. Review each model card, licence, and usage terms before downloading or redistributing. Downloads are large; Wi-Fi and sufficient free storage are recommended.
+- NEXUS can access only the folder explicitly selected by the user.
+- File operations are restricted to files directly inside that folder; path traversal and nested paths are rejected.
+- Text file tools have a 1 MB size limit.
+- HTML preview runs in a WebView with file/content access disabled and no native JavaScript bridge.
+- Deleting files and overwriting existing files require confirmation before the future model tool loop executes them.
+- This milestone does not provide arbitrary shell access or unrestricted device control.
 
 ## Architecture
 
-    Compose UI
+    Local model (next milestone)
        |
-    Model catalogue + model manager
+    Agent tool-call loop (next milestone)
        |
-    Android DownloadManager / Storage Access Framework
+    MCP-compatible tool registry
        |
-    App-specific GGUF storage
+    Workspace permission boundary (user-selected folder)
        |
-    Next: llama.cpp Android native runtime
+    list_files / read_file / write_file / delete_file
        |
-    Later: chat, RAG, MCP tools, security, optimization, evaluations
-
-## Privacy
-
-- Model files are stored in app-specific storage.
-- This milestone does not send prompts to a cloud inference service.
-- Internet access is used for model downloads.
-- Uninstalling the app removes its app-specific model files.
+    HTML preview in isolated WebView
 
 ## Roadmap
 
-- [x] V0.1 — Android project and GGUF model manager
-- [ ] V0.2 — llama.cpp native runtime and offline chat
-- [ ] V0.3 — Model metadata, device guidance, and context controls
-- [ ] V0.4 — Local document RAG
-- [ ] V0.5 — Agent tools and MCP integration
-- [ ] V0.6 — Identity, permissions, and guardrails
-- [ ] V0.7 — Caching, routing, observability, and evaluations
+- [x] Android project and GGUF model manager
+- [x] MCP-compatible workspace tool registry
+- [ ] llama.cpp native runtime and offline chat
+- [ ] Agent tool-call loop, approvals, and execution trace
+- [ ] Sandboxed code runner and local document RAG
+- [ ] Remote MCP server connections (Streamable HTTP)
+- [ ] Identity, permissions, guardrails, and app actions
+- [ ] Caching, routing, observability, and evaluations
 
 Application source code is intended to be MIT-licensed. Third-party model weights remain subject to their own licences and terms.

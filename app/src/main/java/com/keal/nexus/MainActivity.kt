@@ -1,6 +1,7 @@
 package com.keal.nexus
 
 import android.app.DownloadManager
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -194,7 +195,8 @@ private fun NexusApp() {
                 Destination.HOME -> HomeScreen(
                     installedCount = installed.size,
                     notice = notice,
-                    onOpenModels = { destination = Destination.MODELS }
+                    onOpenModels = { destination = Destination.MODELS },
+                    onOpenAgent = { context.startActivity(Intent(context, com.keal.nexus.agent.AgentActivity::class.java)) }
                 )
                 Destination.MODELS -> ModelsScreen(
                     installed = installed,
@@ -253,7 +255,7 @@ private fun TopHeader() {
 }
 
 @Composable
-private fun HomeScreen(installedCount: Int, notice: String, onOpenModels: () -> Unit) {
+private fun HomeScreen(installedCount: Int, notice: String, onOpenModels: () -> Unit, onOpenAgent: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -282,8 +284,13 @@ private fun HomeScreen(installedCount: Int, notice: String, onOpenModels: () -> 
                         Text("LOCAL MODELS", color = Muted, fontSize = 9.sp, letterSpacing = 1.5.sp)
                     }
                     Spacer(Modifier.weight(1f))
-                    Button(onClick = onOpenModels, colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) {
-                        Text("Explore models", fontWeight = FontWeight.Bold)
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Button(onClick = onOpenModels, colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) {
+                            Text("Explore models", fontWeight = FontWeight.Bold)
+                        }
+                        androidx.compose.material3.OutlinedButton(onClick = onOpenAgent) {
+                            Text("Open MCP workspace")
+                        }
                     }
                 }
             }
