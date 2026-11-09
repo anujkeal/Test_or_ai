@@ -290,7 +290,7 @@ static void reset_long_term_states(const bool clear_kv_cache = true) {
     system_prompt_position = 0;
     current_position = 0;
 
-    if (clear_kv_cache)
+    if (clear_kv_cache && g_context)
         llama_memory_clear(llama_get_memory(g_context), false);
 }
 
@@ -576,11 +576,11 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_unload(JNIEnv * /*unused*/, job
     reset_short_term_states();
 
     // Free up resources
-    common_sampler_free(g_sampler);
+    if (g_sampler) { common_sampler_free(g_sampler); g_sampler = nullptr; }
     g_chat_templates.reset();
     g_batch = common_batch();
-    llama_free(g_context);
-    llama_model_free(g_model);
+    if (g_context) { llama_free(g_context); g_context = nullptr; }
+    if (g_model) { llama_model_free(g_model); g_model = nullptr; }
 }
 
 extern "C"
