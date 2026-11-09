@@ -13,10 +13,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val installed = ModelManager.installedModels(this)
+        val preferences = getSharedPreferences("nexus_preferences", MODE_PRIVATE)
+        val lastPath = preferences.getString("last_model_path", null)
+        val selected = installed.firstOrNull { it.absolutePath == lastPath } ?: installed.firstOrNull()
         val intent = Intent(this, ChatActivity::class.java)
-        installed.firstOrNull()?.let {
-            intent.putExtra(ChatActivity.EXTRA_MODEL_PATH, it.absolutePath)
-        }
+        selected?.let { intent.putExtra(ChatActivity.EXTRA_MODEL_PATH, it.absolutePath) }
         startActivity(intent)
         finish()
     }
