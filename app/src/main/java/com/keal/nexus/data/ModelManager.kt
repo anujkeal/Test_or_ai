@@ -30,8 +30,9 @@ object ModelManager {
         File(downloadDirectory(context), model.fileName)
 
     fun installedModels(context: Context): List<File> {
-        val files = (internalDirectory(context).listFiles()?.toList() ?: emptyList()) +
-            (downloadDirectory(context).listFiles()?.toList() ?: emptyList())
+        // Prefer catalogue downloads over same-named manual imports: downloads are checksum-verified.
+        val files = (downloadDirectory(context).listFiles()?.toList() ?: emptyList()) +
+            (internalDirectory(context).listFiles()?.toList() ?: emptyList())
         return files.filter { it.isFile && it.extension.equals("gguf", ignoreCase = true) }
             .distinctBy { it.name }
             .sortedBy { it.name.lowercase() }
