@@ -86,7 +86,10 @@ private fun ChatScreen(
             engine = local
             onEngine(local)
             withContext(Dispatchers.IO) {
-                local.state.first { it is InferenceEngine.State.Initialized || it is InferenceEngine.State.Error }
+                when (val initial = local.state.first { it is InferenceEngine.State.Initialized || it is InferenceEngine.State.Error }) {
+                    is InferenceEngine.State.Error -> throw initial.exception
+                    else -> Unit
+                }
                 local.loadModel(File(modelPath).absolutePath)
                 local.setSystemPrompt("You are a helpful, clear, and thoughtful AI assistant. Answer accurately.")
             }
