@@ -4,7 +4,7 @@
 
 NEXUS AI is an Android-first, on-device AI chat app built with Kotlin, Jetpack Compose and llama.cpp. It runs supported GGUF models locally and includes a permission-scoped workspace foundation.
 
-## V0.7 — Chat-first interface and local inference
+## V0.7.1 — Chat-first interface and local inference
 
 - Chat-first interface based on the NEXUS reference design: model selector, overflow menu, empty state, message composer, model sheet, and settings sheet\n- Model switching unloads the previous native model before loading another
 - New chat and Clear all chats reset the native conversation history and KV cache
