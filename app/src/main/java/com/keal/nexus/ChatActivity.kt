@@ -482,7 +482,7 @@ private fun NexusChatApp(initialPath: String?) {
                                                 manager.enqueue(request)
                                             }.onSuccess { id ->
                                                 downloadModel = model
-                                                downloadId = it
+                                                downloadId = id
                                                 downloadStatus = "Downloading ${model.name}"
                                             }.onFailure { downloadStatus = it.message ?: "Could not start download" }
                                         }
