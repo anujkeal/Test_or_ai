@@ -1,54 +1,78 @@
-# Test_or_ai
+# NEXUS AI
 
-<p align="center">
-  <strong>Curiosity in. Possibilities out.</strong>
-</p>
+**Your AI. Your device. Your data.**
 
-<p align="center">
-  A space to explore ideas, experiment with AI, and turn questions into working projects.
-</p>
+NEXUS AI is an Android-first, offline-first local AI app. V0.1 establishes the model-management foundation: discover, download, import, and manage quantized GGUF language models on-device.
 
----
+## V0.1 — Model Manager
 
-## ✨ About
+- Kotlin + Jetpack Compose Android app
+- Curated GGUF catalogue: Llama 3.2 1B, Qwen2.5 1.5B, and Qwen2.5 3B
+- In-app downloads through Android DownloadManager
+- Download progress and failure reporting
+- Import existing GGUF files through Android's document picker
+- App-specific model storage and model deletion
+- SHA-256 verification for catalogue entries with pinned checksums
 
-**Test_or_ai** is an experimental playground for learning, building, and discovering what is possible with artificial intelligence.
+**Honest milestone boundary:** V0.1 does not generate AI responses yet. The llama.cpp native inference runtime and offline chat are the next milestone. RAG, MCP tools, identity, guardrails, caching, observability, and evaluations follow after inference works.
 
-This repository is a home for prototypes, technical tests, creative experiments, and practical explorations. Some ideas may grow into full projects; others may simply teach us something new. Every experiment is a step forward.
+## Build requirements
 
-## 🎯 What You'll Find Here
+- Android Studio (recent stable release)
+- JDK 17
+- Android SDK Platform 35
+- Android Gradle Plugin 8.7.3
+- Gradle 8.9
 
-- **AI experiments** — exploring tools, models, and intelligent workflows.
-- **Prototypes** — testing ideas through small, focused builds.
-- **Learning notes** — documenting discoveries, useful concepts, and lessons.
-- **Creative problem-solving** — combining curiosity, technology, and imagination.
+Open the repository in Android Studio and sync Gradle. Alternatively, run Gradle 8.9 on a machine with the Android SDK installed:
 
-## 🚀 Getting Started
+    gradle :app:assembleDebug
 
-Clone the repository to explore it locally:
+The debug APK is generated at:
 
-```bash
-git clone https://github.com/anujkeal/Test_or_ai.git
-cd Test_or_ai
-```
+    app/build/outputs/apk/debug/app-debug.apk
 
-As experiments are added, each project will include its own instructions where needed.
+The Android GitHub Actions workflow builds the debug APK on pushes to main and manual dispatches, then uploads it as an artifact.
 
-## 🧭 Our Philosophy
+## Model catalogue
 
-> Experiment boldly. Learn honestly. Build with purpose.
+| Model | Quantization | Approx. size |
+|---|---|---:|
+| Llama 3.2 1B Instruct | Q4_K_M | 0.81 GB |
+| Qwen2.5 1.5B Instruct | Q4_K_M | 0.99 GB |
+| Qwen2.5 3B Instruct | Q4_K_M | 1.93 GB |
 
-Technology advances through questions, iteration, and the willingness to test an idea. This project embraces that process: progress over perfection, understanding over hype.
+Model files are hosted by third parties on Hugging Face. Review each model card, licence, and usage terms before downloading or redistributing. Downloads are large; Wi-Fi and sufficient free storage are recommended.
 
-## 📌 Project Status
+## Architecture
 
-**Status:** Active experimentation  
-**Focus:** Artificial intelligence, learning, and prototyping
+    Compose UI
+       |
+    Model catalogue + model manager
+       |
+    Android DownloadManager / Storage Access Framework
+       |
+    App-specific GGUF storage
+       |
+    Next: llama.cpp Android native runtime
+       |
+    Later: chat, RAG, MCP tools, security, optimization, evaluations
 
-The scope and structure will evolve as new ideas take shape.
+## Privacy
 
----
+- Model files are stored in app-specific storage.
+- This milestone does not send prompts to a cloud inference service.
+- Internet access is used for model downloads.
+- Uninstalling the app removes its app-specific model files.
 
-<p align="center">
-  Made with curiosity by <a href="https://github.com/anujkeal">Anuj Keal</a> · Keep exploring.
-</p>
+## Roadmap
+
+- [x] V0.1 — Android project and GGUF model manager
+- [ ] V0.2 — llama.cpp native runtime and offline chat
+- [ ] V0.3 — Model metadata, device guidance, and context controls
+- [ ] V0.4 — Local document RAG
+- [ ] V0.5 — Agent tools and MCP integration
+- [ ] V0.6 — Identity, permissions, and guardrails
+- [ ] V0.7 — Caching, routing, observability, and evaluations
+
+Application source code is intended to be MIT-licensed. Third-party model weights remain subject to their own licences and terms.
