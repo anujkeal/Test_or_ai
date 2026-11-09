@@ -329,7 +329,7 @@ private fun TopHeader() {
             Text("Local Intelligence", color = Muted, fontSize = 11.sp)
         }
         Spacer(Modifier.weight(1f))
-        Chip("v0.2")
+        Chip("v0.3")
     }
 }
 
@@ -390,7 +390,7 @@ private fun HomeScreen(
                         Spacer(Modifier.width(8.dp))
                         Column {
                             Text("Inference engine", color = MainText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Coming in next milestone", color = MutedLight, fontSize = 12.sp)
+                            Text("Select an installed model to start chatting", color = MutedLight, fontSize = 12.sp)
                         }
                     }
 
@@ -782,14 +782,14 @@ private fun SettingsScreen() {
             InfoCard(
                 emoji = "⚙️",
                 title = "Runtime",
-                body  = "llama.cpp Android integration is the next milestone. Downloaded files are not loaded in this version."
+                body  = "On-device llama.cpp inference. Select an installed GGUF model and tap Start chatting."
             )
         }
         item {
             InfoCard(
                 emoji = "ℹ️",
                 title = "Version",
-                body  = "Nexus AI 0.2.0 · Android API 26+ · GGUF model manager"
+                body  = "Nexus AI 0.3.0 · Android API 26+ · Local GGUF chat"
             )
         }
         item { Spacer(Modifier.height(8.dp)) }
