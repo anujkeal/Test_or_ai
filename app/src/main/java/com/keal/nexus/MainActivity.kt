@@ -259,6 +259,9 @@ private fun NexusApp() {
                         }
                     },
                     onImport       = { importLauncher.launch(arrayOf("*/*")) },
+                    onChat         = { file ->
+                        context.startActivity(Intent(context, ChatActivity::class.java).putExtra(ChatActivity.EXTRA_MODEL_PATH, file.absolutePath))
+                    },
                     onDelete       = { fileName ->
                         scope.launch {
                             withContext(Dispatchers.IO) { ModelManager.deleteModel(context, fileName) }
@@ -481,6 +484,7 @@ private fun ModelsScreen(
     isBusy: Boolean,
     onDownload: (ModelSpec) -> Unit,
     onImport: () -> Unit,
+    onChat: (File) -> Unit,
     onDelete: (String) -> Unit
 ) {
     LazyColumn(
@@ -548,7 +552,8 @@ private fun ModelsScreen(
                 isInstalled   = localFile != null,
                 isDownloading = activeDownload?.model?.id == model.id,
                 onDownload    = { onDownload(model) },
-                onDelete      = { onDelete(model.fileName) }
+                onDelete      = { onDelete(model.fileName) },
+                onChat        = { localFile?.let(onChat) }
             )
         }
 
@@ -559,7 +564,7 @@ private fun ModelsScreen(
         if (imported.isNotEmpty()) {
             item { SectionLabel("Imported Files") }
             items(imported, key = { it.name }) { file ->
-                ImportedFileCard(file, onDelete)
+                ImportedFileCard(file, onDelete, onChat)
             }
         }
 
@@ -623,7 +628,8 @@ private fun ModelCard(
     isInstalled: Boolean,
     isDownloading: Boolean,
     onDownload: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onChat: () -> Unit
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = Surface1),
@@ -662,7 +668,9 @@ private fun ModelCard(
                         verticalAlignment     = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("✓ On device", color = Success, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Button(onClick = onChat, colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
+                            Text("Start chatting", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
                         OutlinedButton(
                             onClick            = onDelete,
                             shape              = RoundedCornerShape(10.dp),
@@ -695,7 +703,7 @@ private fun ModelCard(
 }
 
 @Composable
-private fun ImportedFileCard(file: File, onDelete: (String) -> Unit) {
+private fun ImportedFileCard(file: File, onDelete: (String) -> Unit, onChat: (File) -> Unit) {
     Card(
         colors   = CardDefaults.cardColors(containerColor = Surface1),
         shape    = RoundedCornerShape(14.dp)
@@ -727,6 +735,10 @@ private fun ImportedFileCard(file: File, onDelete: (String) -> Unit) {
                 Text("GGUF header verified · ${formatBytes(file.length())} · Not loaded", color = Muted, fontSize = 11.sp)
             }
             Spacer(Modifier.width(8.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp), horizontalAlignment = Alignment.End) {
+            Button(onClick = { onChat(file) }, colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink), contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)) {
+                Text("Start chatting", fontSize = 10.sp)
+            }
             OutlinedButton(
                 onClick        = { onDelete(file.name) },
                 shape          = RoundedCornerShape(10.dp),
@@ -734,6 +746,7 @@ private fun ImportedFileCard(file: File, onDelete: (String) -> Unit) {
                 colors         = ButtonDefaults.outlinedButtonColors(contentColor = Danger)
             ) {
                 Text("Remove", fontSize = 11.sp)
+            }
             }
         }
     }
