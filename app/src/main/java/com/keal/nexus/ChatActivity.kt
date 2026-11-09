@@ -37,6 +37,8 @@ import com.keal.nexus.data.ModelManager
 import com.keal.nexus.data.ModelSpec
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -95,11 +97,12 @@ private fun NexusChatApp(initialPath: String?) {
     var loadStage by remember { mutableStateOf("Preparing model") }
     var input by remember { mutableStateOf("") }
     var generating by remember { mutableStateOf(false) }
+    var generationJob by remember { mutableStateOf<Job?>(null) }
     var showModels by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
-    var downloadId by remember { mutableStateOf<Long?>(null) }
-    var downloadModel by remember { mutableStateOf<ModelSpec?>(null) }
+    var downloadId by remember { mutableStateOf(prefs.getLong("active_download_id", -1L).takeIf { it >= 0L }) }
+    var downloadModel by remember { mutableStateOf(ModelCatalog.models.firstOrNull { it.id == prefs.getString("active_download_model_id", null) }) }
     var downloadProgress by remember { mutableFloatStateOf(0f) }
     var downloadStatus by remember { mutableStateOf<String?>(null) }
     var installed by remember { mutableStateOf(ModelManager.installedModels(context)) }
