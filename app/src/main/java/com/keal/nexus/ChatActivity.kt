@@ -192,7 +192,7 @@ private fun NexusChatApp(initialPath: String?) {
                 DownloadManager.STATUS_SUCCESSFUL -> {
                     val model = downloadModel
                     val file = model?.let { ModelManager.modelFile(context, it) }
-                    val valid = file?.let { model?.sha256 == null || ModelManager.verifySha256(it, model.sha256!!) } ?: false
+                    val valid = file?.let { candidate -> model?.sha256 == null || withContext(Dispatchers.IO) { ModelManager.verifySha256(candidate, model.sha256!!) } } ?: false
                     if (valid && file != null) {
                         installed = ModelManager.installedModels(context)
                         downloadStatus = "Ready to chat"
