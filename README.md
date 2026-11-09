@@ -2,21 +2,21 @@
 
 **Your AI. Your device. Your data.**
 
-NEXUS AI is an Android-first local AI project. The current source establishes a GGUF model manager and an MCP-compatible, permission-scoped workspace tool foundation.
+NEXUS AI is an Android-first, on-device AI chat app built with Kotlin, Jetpack Compose and llama.cpp. It runs supported GGUF models locally and includes a permission-scoped workspace foundation.
 
-## V0.2 — MCP Workspace Foundation
+## V0.6 — Chat-first interface and local inference
 
-- Kotlin + Jetpack Compose Android app
+- Chat-first interface based on the NEXUS reference design: model selector, overflow menu, empty state, message composer, model sheet, and settings sheet\n- Light, dark, and system themes\n- Wi-Fi-only download preference\n- Last-used model selection is restored on launch\n- Kotlin + Jetpack Compose Android app
 - Curated GGUF catalogue: Llama 3.2 1B, Qwen2.5 1.5B, Qwen2.5 3B
 - Model downloads through Android DownloadManager
 - Import GGUF files through Android's Storage Access Framework
 - App-specific model storage and deletion
 - User-selected workspace folder through Android's Storage Access Framework
-- MCP JSON-RPC core methods: initialize, ping, tools/list, tools/call
+- llama.cpp-backed local GGUF inference and streaming chat\n- MCP JSON-RPC core methods: initialize, ping, tools/list, tools/call
 - Workspace tools: list, read, write, and delete files
 - Local HTML preview in a WebView without a native JavaScript bridge
 
-**Honest milestone boundary:** the MCP workspace registry is currently an in-process MCP-compatible tool layer. It is not yet connected to the local model's generation loop and is not an external network MCP server. The app cannot yet autonomously decide which tools to call. The next milestone connects llama.cpp inference to this registry with approval gates for destructive and externally visible actions.
+**Honest milestone boundary:** local chat is implemented, but the MCP workspace registry is still an in-process MCP-compatible tool layer. It is not connected to the model's generation loop and is not an external network MCP server. The model cannot yet autonomously decide which tools to call.
 
 ## Build requirements
 
@@ -63,7 +63,7 @@ GitHub Actions builds the debug APK on pushes to main and manual dispatches, the
 
 - [x] Android project and GGUF model manager
 - [x] MCP-compatible workspace tool registry
-- [ ] llama.cpp native runtime and offline chat
+- [x] llama.cpp native runtime and offline chat
 - [ ] Agent tool-call loop, approvals, and execution trace
 - [ ] Sandboxed code runner and local document RAG
 - [ ] Remote MCP server connections (Streamable HTTP)
