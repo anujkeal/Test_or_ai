@@ -192,6 +192,31 @@ private fun NexusChatApp(initialPath: String?) {
         }
     }
 
+    fun resetChat() {
+        messages.clear()
+        input = ""
+        loadError = null
+        ready = false
+        loading = true
+        scope.launch {
+            try {
+                generationJob?.cancelAndJoin()
+                generationJob = null
+                generating = false
+                engine?.resetConversation(NEXUS_SYSTEM_PROMPT) ?: error("Inference engine is unavailable.")
+                ready = true
+            } catch (t: Throwable) {
+                ready = false
+                loadError = buildString {
+                    append(t.javaClass.simpleName)
+                    t.message?.takeIf { it.isNotBlank() }?.let { append(": ").append(it) }
+                }
+            } finally {
+                loading = false
+            }
+        }
+    }
+
     LaunchedEffect(downloadId) {
         val id = downloadId ?: return@LaunchedEffect
         while (true) {
@@ -297,11 +322,9 @@ private fun NexusChatApp(initialPath: String?) {
                             containerColor = surface
                         ) {
                             MenuEntry("＋", "New chat") {
-                                messages.clear(); input = ""; loadError = null; showMenu = false
-                                if (ready) scope.launch {
-                                    runCatching { engine?.resetConversation(NEXUS_SYSTEM_PROMPT) }
-                                        .onFailure { downloadStatus = "Could not reset chat: ${it.message}" }
-                                }
+                                showMenu = false
+                                if (ready || generating) resetChat()
+                                else { messages.clear(); input = "" }
                             }
                             MenuEntry("▱", "Workspace folder") {
                                 showMenu = false
