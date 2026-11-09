@@ -25,6 +25,9 @@ interface InferenceEngine {
      */
     suspend fun setSystemPrompt(systemPrompt: String)
 
+    /** Reset native conversation history and KV cache while keeping the model loaded. */
+    suspend fun resetConversation(systemPrompt: String)
+
     /**
      * Sends a user prompt to the loaded model and returns a Flow of generated tokens.
      */
