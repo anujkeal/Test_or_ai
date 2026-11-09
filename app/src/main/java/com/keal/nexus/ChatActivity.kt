@@ -224,6 +224,8 @@ private fun NexusChatApp(initialPath: String?) {
             if (snapshot == null) {
                 downloadStatus = "Download status unavailable"
                 downloadId = null
+                downloadModel = null
+                prefs.edit().remove("active_download_id").remove("active_download_model_id").apply()
                 break
             }
             downloadProgress = snapshot.progress.coerceIn(0f, 1f)
@@ -246,11 +248,15 @@ private fun NexusChatApp(initialPath: String?) {
                         downloadStatus = "Model verification failed. Please download it again."
                     }
                     downloadId = null
+                    downloadModel = null
+                    prefs.edit().remove("active_download_id").remove("active_download_model_id").apply()
                     break
                 }
                 DownloadManager.STATUS_FAILED -> {
                     downloadStatus = "Download failed. Check your connection and storage."
                     downloadId = null
+                    downloadModel = null
+                    prefs.edit().remove("active_download_id").remove("active_download_model_id").apply()
                     break
                 }
                 else -> delay(700)
@@ -522,6 +528,10 @@ private fun NexusChatApp(initialPath: String?) {
                                             }.onSuccess { id ->
                                                 downloadModel = model
                                                 downloadId = id
+                                                prefs.edit()
+                                                    .putLong("active_download_id", id)
+                                                    .putString("active_download_model_id", model.id)
+                                                    .apply()
                                                 downloadStatus = "Downloading ${model.name}"
                                             }.onFailure { downloadStatus = it.message ?: "Could not start download" }
                                         }
