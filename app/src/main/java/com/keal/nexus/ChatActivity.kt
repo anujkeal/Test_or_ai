@@ -51,14 +51,9 @@ class ChatActivity : ComponentActivity() {
         }
     }
 
-    override fun onDestroy() {
-        engine?.destroy()
-        engine = null
-        super.onDestroy()
-    }
-
     companion object {
         const val EXTRA_MODEL_PATH = "model_path"
+        var loadedModelPath: String? = null
     }
 }
 
