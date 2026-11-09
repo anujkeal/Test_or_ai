@@ -69,6 +69,7 @@ private fun ChatScreen(
     var engine by remember { mutableStateOf<InferenceEngine?>(null) }
     var input by remember { mutableStateOf("") }
     var status by remember { mutableStateOf("Loading model…") }
+    var loadStage by remember { mutableStateOf("Preparing native engine") }
     var ready by remember { mutableStateOf(false) }
     var generating by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -76,23 +77,35 @@ private fun ChatScreen(
 
     LaunchedEffect(modelPath) {
         try {
+            loadStage = "Initialising native engine"
             val local = withContext(Dispatchers.Default) {
                 AiChat.getInferenceEngine(context)
             }
             engine = local
             onEngine(local)
             withContext(Dispatchers.IO) {
+                loadStage = "Waiting for native runtime"
                 when (val initial = local.state.first { it is InferenceEngine.State.Initialized || it is InferenceEngine.State.Error }) {
                     is InferenceEngine.State.Error -> throw initial.exception
                     else -> Unit
                 }
+                loadStage = "Loading GGUF weights (${File(modelPath).length() / (1024 * 1024)} MB)"
                 local.loadModel(File(modelPath).absolutePath)
+                loadStage = "Preparing context"
                 local.setSystemPrompt("You are a helpful, clear, and thoughtful AI assistant. Answer accurately.")
             }
             ready = true
             status = "Ready"
         } catch (t: Throwable) {
-            error = t.message ?: "Could not load this model."
+            val details = buildString {
+                append(t.javaClass.simpleName)
+                t.message?.takeIf { it.isNotBlank() }?.let { append(": ").append(it) }
+                t.cause?.let { cause ->
+                    append("\nCaused by ").append(cause.javaClass.simpleName)
+                    cause.message?.takeIf { it.isNotBlank() }?.let { append(": ").append(it) }
+                }
+            }
+            error = "Failed during: $loadStage\n$details"
             status = "Could not load model"
         }
     }
@@ -113,7 +126,7 @@ private fun ChatScreen(
         HorizontalDivider(color = Color(0xFF263445))
         if (error != null) {
             Text(error!!, color = Color(0xFFF87171), modifier = Modifier.padding(12.dp))
-            Text("Check that the GGUF file is valid and that your phone has enough free memory.", color = Color.LightGray)
+            Text("The app reports the exact loading stage and error. Close other apps before loading this 3B model.", color = Color.LightGray)
         }
         LazyColumn(
             modifier = Modifier.weight(1f).fillMaxWidth(),
