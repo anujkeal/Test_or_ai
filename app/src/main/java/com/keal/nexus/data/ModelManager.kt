@@ -12,7 +12,8 @@ import java.security.MessageDigest
 data class DownloadSnapshot(
     val status: Int,
     val downloadedBytes: Long,
-    val totalBytes: Long
+    val totalBytes: Long,
+    val reason: Int
 ) {
     val progress: Float
         get() = if (totalBytes > 0L) downloadedBytes.toFloat() / totalBytes.toFloat() else 0f
@@ -62,7 +63,8 @@ object ModelManager {
             return DownloadSnapshot(
                 status = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)),
                 downloadedBytes = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)),
-                totalBytes = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                totalBytes = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)),
+                reason = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
             )
         }
     }
