@@ -31,6 +31,11 @@ android {
     kotlinOptions { jvmTarget = "17" }
 
     packaging {
+        jniLibs {
+            // GGML CPU backend plugins are loaded with dlopen() from nativeLibraryDir.
+            // Extract them as real files instead of leaving them compressed inside the APK.
+            useLegacyPackaging = true
+        }
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
     }
 }
