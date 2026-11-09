@@ -80,19 +80,39 @@ object ModelManager {
         }
 
         val safeName = displayName.substringAfterLast("/")
-        val destination = File(internalDirectory(context), safeName)
+        val directory = internalDirectory(context)
+        val destination = File(directory, safeName)
+        val temporary = File(directory, "$safeName.importing")
         val input = context.contentResolver.openInputStream(uri)
             ?: error("Android could not open the selected file.")
-        input.use { source ->
-            destination.outputStream().buffered().use { output -> source.copyTo(output) }
-        }
-        if (!hasGgufMagic(destination)) {
-            destination.delete()
-            error("The selected file does not have a valid GGUF header. It was not added to your model library.")
-        }
-        return destination
-    }
 
+        try {
+            input.use { source ->
+                temporary.outputStream().buffered().use { output -> source.copyTo(output) }
+            }
+            if (!hasGgufMagic(temporary)) {
+                error("The selected file does not have a valid GGUF header.")
+            }
+
+            // For catalogue models, require the known publisher checksum even on manual import.
+            val knownModel = ModelCatalog.models.firstOrNull { it.fileName.equals(safeName, ignoreCase = true) }
+            val expectedSha = knownModel?.sha256
+            if (expectedSha != null && !verifySha256(temporary, expectedSha)) {
+                error("SHA-256 verification failed. This file is incomplete or modified. Download ${knownModel.name} from the NEXUS model catalogue instead.")
+            }
+
+            if (destination.exists() && !destination.delete()) {
+                error("Could not replace the existing model file.")
+            }
+            if (!temporary.renameTo(destination)) {
+                error("Could not finish importing the model. Check available storage and try again.")
+            }
+            return destination
+        } catch (t: Throwable) {
+            temporary.delete()
+            throw t
+        }
+    }
     fun hasGgufMagic(file: File): Boolean {
         if (!file.isFile || file.length() < 4L) return false
         return file.inputStream().buffered().use { input ->
