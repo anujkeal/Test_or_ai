@@ -74,10 +74,15 @@ object ModelManager {
         }
     }
 
-    fun importModel(context: Context, uri: Uri): File {
+    fun importModel(context: Context, uri: Uri, onProgress: (copiedBytes: Long, totalBytes: Long) -> Unit = { _, _ -> }): File {
+        var totalBytes = -1L
         val displayName = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
             val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            if (cursor.moveToFirst() && nameIndex >= 0) cursor.getString(nameIndex) else null
+            val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+            if (cursor.moveToFirst()) {
+                if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) totalBytes = cursor.getLong(sizeIndex)
+                if (nameIndex >= 0) cursor.getString(nameIndex) else null
+            } else null
         } ?: "imported-model.gguf"
 
         require(displayName.endsWith(".gguf", ignoreCase = true)) {
@@ -93,7 +98,25 @@ object ModelManager {
 
         try {
             input.use { source ->
-                temporary.outputStream().buffered().use { output -> source.copyTo(output) }
+                temporary.outputStream().buffered().use { output ->
+                    val buffer = ByteArray(1024 * 1024)
+                    var copiedBytes = 0L
+                    var lastReportedBytes = 0L
+                    while (true) {
+                        val count = source.read(buffer)
+                        if (count < 0) break
+                        output.write(buffer, 0, count)
+                        copiedBytes += count
+                        if (copiedBytes - lastReportedBytes >= 4L * 1024L * 1024L ||
+                            (totalBytes > 0L && copiedBytes >= totalBytes)
+                        ) {
+                            onProgress(copiedBytes, totalBytes)
+                            lastReportedBytes = copiedBytes
+                        }
+                    }
+                    output.flush()
+                    onProgress(copiedBytes, totalBytes)
+                }
             }
             if (!hasGgufMagic(temporary)) {
                 error("The selected file does not have a valid GGUF header.")
