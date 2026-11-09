@@ -38,12 +38,16 @@ object ModelManager {
             .sortedBy { it.name.lowercase() }
     }
 
-    fun enqueueDownload(context: Context, model: ModelSpec): Long {
+    fun enqueueDownload(context: Context, model: ModelSpec, wifiOnly: Boolean): Long {
+        val destination = modelFile(context, model)
+        if (destination.exists() && !destination.delete()) {
+            throw IllegalStateException("Could not remove the incomplete model file. Delete it and retry.")
+        }
         val request = DownloadManager.Request(Uri.parse(model.downloadUrl))
             .setTitle(model.name)
             .setDescription("Downloading " + model.quantization + " GGUF model")
             .setMimeType("application/octet-stream")
-            .setAllowedOverMetered(false)
+            .setAllowedOverMetered(!wifiOnly)
             .setAllowedOverRoaming(false)
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalFilesDir(
