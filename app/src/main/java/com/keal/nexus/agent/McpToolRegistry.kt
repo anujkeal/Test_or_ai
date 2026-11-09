@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** In-process MCP-compatible workspace tools; not a network MCP server. */
-class McpToolRegistry(private val workspace: WorkspaceStore) {
+class McpToolRegistry(private val workspace: WorkspaceStore, private val preferences: NexusPreferences) {
     fun listTools(): JSONArray = JSONArray().apply {
         put(tool("workspace.list_files", "List files in the user-selected workspace folder.", JSONObject()))
         put(tool("workspace.read_file", "Read a UTF-8 text file from the workspace. Maximum 1 MB.",
@@ -21,6 +21,9 @@ class McpToolRegistry(private val workspace: WorkspaceStore) {
     /** userApproved must come from a trusted app UI confirmation, never from model arguments. */
     fun callTool(name: String, arguments: JSONObject, userApproved: Boolean = false): JSONObject {
         return try {
+            if (!preferences.isToolAllowed(name)) {
+                throw SecurityException("Access blocked by user permissions. Enable this tool in Access settings first.")
+            }
             val result = when (name) {
                 "workspace.list_files" -> workspace.listFiles().joinToString("\n").ifBlank { "Workspace is empty." }
                 "workspace.read_file" -> workspace.readFile(arguments.getString("name"))
@@ -52,7 +55,7 @@ class McpToolRegistry(private val workspace: WorkspaceStore) {
             "initialize" -> JSONObject()
                 .put("protocolVersion", "2024-11-05")
                 .put("capabilities", JSONObject().put("tools", JSONObject().put("listChanged", false)))
-                .put("serverInfo", JSONObject().put("name", "nexus-workspace").put("version", "0.2.0"))
+                .put("serverInfo", JSONObject().put("name", preferences.assistantName.lowercase().replace(" ", "-")).put("version", "0.2.0"))
             "notifications/initialized" -> return JSONObject()
             "ping" -> JSONObject()
             "tools/list" -> JSONObject().put("tools", listTools())
