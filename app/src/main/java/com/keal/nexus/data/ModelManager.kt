@@ -86,7 +86,20 @@ object ModelManager {
         input.use { source ->
             destination.outputStream().buffered().use { output -> source.copyTo(output) }
         }
+        if (!hasGgufMagic(destination)) {
+            destination.delete()
+            error("The selected file does not have a valid GGUF header. It was not added to your model library.")
+        }
         return destination
+    }
+
+    fun hasGgufMagic(file: File): Boolean {
+        if (!file.isFile || file.length() < 4L) return false
+        return file.inputStream().buffered().use { input ->
+            val magic = ByteArray(4)
+            input.read(magic) == 4 &&
+                magic.contentEquals(byteArrayOf(0x47, 0x47, 0x55, 0x46))
+        }
     }
 
     fun deleteModel(context: Context, fileName: String): Boolean {
