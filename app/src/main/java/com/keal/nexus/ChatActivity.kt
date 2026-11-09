@@ -43,6 +43,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+private const val NEXUS_SYSTEM_PROMPT = "You are NEXUS, a helpful, clear and thoughtful on-device AI assistant. Answer accurately and naturally."
+
 private data class ChatMessage(val user: Boolean, val text: String)
 
 private val NexusDark = Color(0xFF0D1016)
@@ -159,16 +161,22 @@ private fun NexusChatApp(initialPath: String?) {
             engine = local
             withContext(Dispatchers.IO) {
                 loadStage = "Waiting for native runtime"
-                when (val initial = local.state.first {
-                    it is InferenceEngine.State.Initialized || it is InferenceEngine.State.Error
-                }) {
-                    is InferenceEngine.State.Error -> throw initial.exception
+                // Wait for any previous load/generation transition before reusing the singleton.
+                local.state.first {
+                    it is InferenceEngine.State.Initialized ||
+                    it is InferenceEngine.State.ModelReady ||
+                    it is InferenceEngine.State.Error
+                }
+                when (local.state.value) {
+                    is InferenceEngine.State.ModelReady, is InferenceEngine.State.Error -> local.cleanUp()
                     else -> Unit
                 }
+                local.state.first { it is InferenceEngine.State.Initialized || it is InferenceEngine.State.Error }
+                    .let { state -> if (state is InferenceEngine.State.Error) throw state.exception }
                 loadStage = "Loading model weights"
                 local.loadModel(File(path).absolutePath)
                 loadStage = "Preparing chat"
-                local.setSystemPrompt("You are NEXUS, a helpful, clear and thoughtful on-device AI assistant. Answer accurately and naturally.")
+                local.setSystemPrompt(NEXUS_SYSTEM_PROMPT)
             }
             ready = true
         } catch (t: Throwable) {
@@ -287,6 +295,10 @@ private fun NexusChatApp(initialPath: String?) {
                         ) {
                             MenuEntry("＋", "New chat") {
                                 messages.clear(); input = ""; loadError = null; showMenu = false
+                                if (ready) scope.launch {
+                                    runCatching { engine?.resetConversation(NEXUS_SYSTEM_PROMPT) }
+                                        .onFailure { downloadStatus = "Could not reset chat: ${it.message}" }
+                                }
                             }
                             MenuEntry("▱", "Workspace folder") {
                                 showMenu = false
@@ -447,7 +459,7 @@ private fun NexusChatApp(initialPath: String?) {
                         }
                         val selected = file?.absolutePath == modelPath
                         Row(
-                            Modifier.fillMaxWidth().clickable(enabled = file != null) {
+                            Modifier.fillMaxWidth().clickable(enabled = file != null && !generating && !loading) {
                                 file?.let { selectedFile ->
                                     if (selectedFile.absolutePath != modelPath) messages.clear()
                                     modelPath = selectedFile.absolutePath
@@ -475,16 +487,7 @@ private fun NexusChatApp(initialPath: String?) {
                                     onClick = {
                                         if (downloadId == null) {
                                             runCatching {
-                                                val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                                                val request = DownloadManager.Request(android.net.Uri.parse(model.downloadUrl))
-                                                    .setTitle(model.name)
-                                                    .setDescription("Downloading GGUF model")
-                                                    .setMimeType("application/octet-stream")
-                                                    .setAllowedOverMetered(!wifiOnly)
-                                                    .setAllowedOverRoaming(false)
-                                                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                                                    .setDestinationInExternalFilesDir(context, android.os.Environment.DIRECTORY_DOWNLOADS, "models/${model.fileName}")
-                                                manager.enqueue(request)
+                                                ModelManager.enqueueDownload(context, model, wifiOnly)
                                             }.onSuccess { id ->
                                                 downloadModel = model
                                                 downloadId = id
@@ -576,7 +579,14 @@ private fun NexusChatApp(initialPath: String?) {
                     }
                     HorizontalDivider(color = border)
                     Row(
-                        Modifier.fillMaxWidth().clickable { messages.clear(); showSettings = false }.padding(vertical = 22.dp),
+                        Modifier.fillMaxWidth().clickable {
+                            messages.clear()
+                            showSettings = false
+                            if (ready) scope.launch {
+                                runCatching { engine?.resetConversation(NEXUS_SYSTEM_PROMPT) }
+                                    .onFailure { downloadStatus = "Could not reset chat: ${it.message}" }
+                            }
+                        }.padding(vertical = 22.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text("▤", color = mutedText, fontSize = 22.sp)
