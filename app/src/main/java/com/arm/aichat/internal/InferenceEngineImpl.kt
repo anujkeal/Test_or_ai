@@ -137,8 +137,10 @@ internal class InferenceEngineImpl private constructor(
                 _state.value = InferenceEngine.State.Initialized
                 Log.i(TAG, "Native library loaded! System info: \n${systemInfo()}")
 
-            } catch (e: Exception) {
+            } catch (t: Throwable) {
+                val e = t as? Exception ?: RuntimeException(t)
                 Log.e(TAG, "Failed to load native library", e)
+                _state.value = InferenceEngine.State.Error(e)
                 throw e
             }
         }
