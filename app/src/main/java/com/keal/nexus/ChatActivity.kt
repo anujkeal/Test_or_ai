@@ -443,9 +443,11 @@ private fun NexusChatApp(initialPath: String?) {
                         val selected = file?.absolutePath == modelPath
                         Row(
                             Modifier.fillMaxWidth().clickable(enabled = file != null) {
-                                if (file!!.absolutePath != modelPath) messages.clear()
-                                modelPath = file.absolutePath
-                                showModels = false
+                                file?.let { selectedFile ->
+                                    if (selectedFile.absolutePath != modelPath) messages.clear()
+                                    modelPath = selectedFile.absolutePath
+                                    showModels = false
+                                }
                             }.padding(vertical = 16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
