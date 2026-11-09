@@ -221,6 +221,26 @@ internal class InferenceEngineImpl private constructor(
             _state.value = InferenceEngine.State.ModelReady
         }
 
+    /** Reset native conversation history and KV cache without unloading model weights. */
+    override suspend fun resetConversation(systemPrompt: String) =
+        withContext(llamaDispatcher) {
+            require(systemPrompt.isNotBlank()) { "System prompt cannot be empty." }
+            check(_state.value is InferenceEngine.State.ModelReady) {
+                "Cannot reset conversation in ${_state.value.javaClass.simpleName}."
+            }
+            _state.value = InferenceEngine.State.ProcessingSystemPrompt
+            try {
+                val result = processSystemPrompt(systemPrompt)
+                if (result != 0) throw IOException("Failed to reset conversation: $result")
+                _systemPrompt = systemPrompt
+                _readyForSystemPrompt = false
+                _state.value = InferenceEngine.State.ModelReady
+            } catch (e: Exception) {
+                _state.value = InferenceEngine.State.Error(e)
+                throw e
+            }
+        }
+
     /**
      * Send plain text user prompt to LLM, which starts generating tokens in a [Flow]
      */
