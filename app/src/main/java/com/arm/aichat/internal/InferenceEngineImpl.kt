@@ -89,6 +89,9 @@ internal class InferenceEngineImpl private constructor(
     private external fun prepare(): Int
 
     @FastNative
+    private external fun nativeLastError(): String
+
+    @FastNative
     private external fun systemInfo(): String
 
     @FastNative
@@ -168,7 +171,10 @@ internal class InferenceEngineImpl private constructor(
                 _state.value = InferenceEngine.State.LoadingModel
                 load(pathToModel).let {
                     // TODO-han.yin: find a better way to pass other error codes
-                    if (it != 0) throw UnsupportedArchitectureException()
+                    if (it != 0) {
+                        val detail = nativeLastError().ifBlank { "llama.cpp could not load this GGUF file. Check its integrity and format compatibility." }
+                        throw IOException("GGUF load failed: $detail")
+                    }
                 }
                 prepare().let {
                     if (it != 0) throw IOException("Failed to prepare resources")
