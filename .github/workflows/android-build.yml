@@ -21,11 +21,10 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install NDK and CMake
-        run: sdkmanager "ndk;29.0.13113456" "cmake;3.31.6"
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager --sdk_root="$ANDROID_HOME" "ndk;29.0.13113456" "cmake;3.31.6"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
