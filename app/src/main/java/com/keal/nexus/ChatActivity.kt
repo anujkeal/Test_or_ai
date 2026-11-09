@@ -431,17 +431,22 @@ private fun NexusChatApp(initialPath: String?) {
                                 messages.add(ChatMessage(true, prompt))
                                 messages.add(ChatMessage(false, ""))
                                 generating = true
-                                scope.launch {
+                                generationJob = scope.launch {
                                     try {
                                         val answer = StringBuilder()
                                         engine?.sendUserPrompt(prompt, 512)?.collect { token ->
                                             answer.append(token)
                                             if (messages.isNotEmpty()) messages[messages.lastIndex] = ChatMessage(false, answer.toString())
                                         }
+                                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                        throw cancelled
                                     } catch (t: Throwable) {
                                         if (messages.isNotEmpty() && messages.last().text.isBlank()) messages.removeAt(messages.lastIndex)
                                         messages.add(ChatMessage(false, "I couldn't generate a response: ${t.message ?: "unknown error"}"))
-                                    } finally { generating = false }
+                                    } finally {
+                                        generating = false
+                                        generationJob = null
+                                    }
                                 }
                             }
                         },
@@ -606,12 +611,9 @@ private fun NexusChatApp(initialPath: String?) {
                     HorizontalDivider(color = border)
                     Row(
                         Modifier.fillMaxWidth().clickable {
-                            messages.clear()
                             showSettings = false
-                            if (ready) scope.launch {
-                                runCatching { engine?.resetConversation(NEXUS_SYSTEM_PROMPT) }
-                                    .onFailure { downloadStatus = "Could not reset chat: ${it.message}" }
-                            }
+                            if (ready || generating) resetChat()
+                            else messages.clear()
                         }.padding(vertical = 22.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -621,7 +623,7 @@ private fun NexusChatApp(initialPath: String?) {
                     }
                     HorizontalDivider(color = border)
                     Spacer(Modifier.height(18.dp))
-                    Text("NEXUS AI 0.6.0 · Everything stays on your device.\nNo cloud, no tracking.", color = mutedText, fontSize = 14.sp, lineHeight = 21.sp)
+                    Text("NEXUS AI 0.7.0 · Everything stays on your device.\nNo cloud, no tracking.", color = mutedText, fontSize = 14.sp, lineHeight = 21.sp)
                 }
             }
         }
