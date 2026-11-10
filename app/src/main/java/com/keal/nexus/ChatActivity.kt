@@ -649,10 +649,12 @@ private fun NexusChatApp(initialPath: String?) {
                                         val activeEngine = engine ?: error("The local inference engine is unavailable.")
                                         // Explicit device requests are handled by Android, not by model-generated claims.
                                         val callMatch = Regex("^(?:please\\s+)?(?:call|dial|phone)\\s+(?:my\\s+)?(.+)$", RegexOption.IGNORE_CASE).matchEntire(prompt)
-                                        val deviceResult = if (!prefs.getBoolean("android_control_enabled", false)) {
-                                            null
-                                        } else when {
-                                            callMatch != null -> {
+                                        val deviceActions = NexusDeviceActions(context.applicationContext)
+                                        val androidControlEnabled = prefs.getBoolean("android_control_enabled", false)
+                                        val deviceResult = when {
+                                            deviceActions.isUnrestrictedShellRequest(prompt) ->
+                                                "NEXUS cannot execute arbitrary CMD, PowerShell, ADB shell or terminal commands. Android does not provide Windows CMD, and unrestricted shell access is intentionally blocked. Use the supported app, navigation, flashlight and workspace actions instead."
+                                            callMatch != null && androidControlEnabled -> {
                                                 val name = callMatch.groupValues[1].trim()
                                                 selectedCallName = name
                                                 contactPicker.launch(
@@ -660,7 +662,12 @@ private fun NexusChatApp(initialPath: String?) {
                                                 )
                                                 "Choose $name from your contacts. I'll open the dialer with the selected number; confirm the call there."
                                             }
-                                            else -> NexusDeviceActions(context.applicationContext).execute(prompt)
+                                            callMatch != null ->
+                                                "Phone actions are disabled. Enable Android command control in NEXUS Settings first."
+                                            androidControlEnabled -> deviceActions.execute(prompt)
+                                            deviceActions.isSupportedDeviceRequest(prompt) ->
+                                                "Android command control is disabled. Open NEXUS Settings and enable it to use this device action."
+                                            else -> null
                                         }
                                         if (deviceResult != null) {
                                             if (messages.isNotEmpty()) messages[messages.lastIndex] = ChatMessage(false, deviceResult)
