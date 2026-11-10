@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
+import android.provider.Settings
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
@@ -409,6 +410,11 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
             }
             Spacer(Modifier.height(10.dp))
             Text("Tap to speak · on-device recognition", color = muted, fontSize = 11.sp)
+            TextButton(onClick = {
+                context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }) {
+                Text("Set up app control", color = accent, fontSize = 12.sp)
+            }
         }
     }
 }
