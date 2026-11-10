@@ -580,6 +580,72 @@ private fun NexusChatApp(initialPath: String?) {
                                 generationJob = scope.launch {
                                     try {
                                         val activeEngine = engine ?: error("The local inference engine is unavailable.")
+                                        val workspaceIntent = toolRuntime.detectWorkspaceIntent(prompt)
+                                        if (workspaceIntent != null) {
+                                            val intentResult = when (workspaceIntent.action) {
+                                                com.keal.nexus.agent.WorkspaceIntent.Action.PATH -> withContext(Dispatchers.IO) {
+                                                    toolRuntime.describePath(workspaceIntent.fileName ?: error("A file name is required."))
+                                                }
+                                                com.keal.nexus.agent.WorkspaceIntent.Action.LIST,
+                                                com.keal.nexus.agent.WorkspaceIntent.Action.READ -> {
+                                                    val call = toolRuntime.callFor(workspaceIntent.action, workspaceIntent.fileName)
+                                                        ?: error("Could not prepare the workspace request.")
+                                                    if (!toolRuntime.isAllowed(call)) {
+                                                        "I did not access any files. Select a workspace folder and enable ${call.name} in Workspace permissions."
+                                                    } else withContext(Dispatchers.IO) {
+                                                        toolRuntime.execute(call)
+                                                    }
+                                                }
+                                                com.keal.nexus.agent.WorkspaceIntent.Action.WRITE -> {
+                                                    val fileName = workspaceIntent.fileName ?: error("A file name is required.")
+                                                    val callWithoutContent = toolRuntime.callFor(workspaceIntent.action, fileName)
+                                                        ?: error("Could not prepare the file write.")
+                                                    if (!toolRuntime.isAllowed(callWithoutContent)) {
+                                                        "I did not create the file. Select a workspace folder and enable workspace.write_file in Workspace permissions, then try again."
+                                                    } else {
+                                                        val rawContent = StringBuilder()
+                                                        activeEngine.sendUserPrompt(
+                                                            toolRuntime.contentGenerationPrompt(prompt, fileName),
+                                                            768
+                                                        ).collect { token -> rawContent.append(token) }
+                                                        val generatedContent = toolRuntime.cleanGeneratedFileContent(rawContent.toString())
+                                                        val looksLikeHtml = fileName.endsWith(".html", true) || fileName.endsWith(".htm", true)
+                                                        if (generatedContent.isBlank() ||
+                                                            toolRuntime.parseToolCall(generatedContent) != null ||
+                                                            (looksLikeHtml && (!generatedContent.contains("<html", true) || !generatedContent.contains("</html>", true)))
+                                                        ) {
+                                                            "I did not create $fileName because the model did not produce valid file contents. Please try again with a more specific request."
+                                                        } else {
+                                                            val writeCall = toolRuntime.callFor(workspaceIntent.action, fileName, generatedContent)
+                                                                ?: error("Could not prepare the file write.")
+                                                            val decision = CompletableDeferred<Boolean>()
+                                                            pendingToolApproval = PendingToolApproval(writeCall, decision)
+                                                            val approved = decision.await()
+                                                            pendingToolApproval = null
+                                                            if (approved) withContext(Dispatchers.IO) {
+                                                                toolRuntime.execute(writeCall, userApproved = true)
+                                                            } else "File creation cancelled. No file was written."
+                                                        }
+                                                    }
+                                                }
+                                                com.keal.nexus.agent.WorkspaceIntent.Action.DELETE -> {
+                                                    val call = toolRuntime.callFor(workspaceIntent.action, workspaceIntent.fileName)
+                                                        ?: error("Could not prepare the delete request.")
+                                                    if (!toolRuntime.isAllowed(call)) {
+                                                        "I did not delete anything. Select a workspace folder and enable workspace.delete_file in Workspace permissions."
+                                                    } else {
+                                                        val decision = CompletableDeferred<Boolean>()
+                                                        pendingToolApproval = PendingToolApproval(call, decision)
+                                                        val approved = decision.await()
+                                                        pendingToolApproval = null
+                                                        if (approved) withContext(Dispatchers.IO) {
+                                                            toolRuntime.execute(call, userApproved = true)
+                                                        } else "File deletion cancelled. No file was deleted."
+                                                    }
+                                                }
+                                            }
+                                            if (messages.isNotEmpty()) messages[messages.lastIndex] = ChatMessage(false, intentResult)
+                                        } else {
                                         var nextPrompt = prompt
                                         var toolCallCount = 0
                                         while (true) {
@@ -621,6 +687,7 @@ private fun NexusChatApp(initialPath: String?) {
                                             nextPrompt = "Workspace tool execution has completed.\n" +
                                                 toolResult +
                                                 "\nNow answer the user's original request using this result. Be explicit if the tool failed or permission was denied. Do not output another tool request unless another permitted operation is essential."
+                                        }
                                         }
                                     } catch (cancelled: kotlinx.coroutines.CancellationException) {
                                         throw cancelled
