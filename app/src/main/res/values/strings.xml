@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">NEXUS AI</string>
+    <string name="nexus_accessibility_description">Allows NEXUS to perform navigation actions you explicitly request, such as Back, Home, notifications and quick settings. NEXUS does not continuously inspect screen content.</string>
+</resources>
