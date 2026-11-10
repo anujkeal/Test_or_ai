@@ -111,12 +111,12 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
         caption = "Sending your words to NEXUS"
         scope.launch {
             try {
-                val activeEngine = engine ?: error("The inference engine is unavailable.")
+                val activeEngine = engine ?: kotlin.error("The inference engine is unavailable.")
                 if (activeEngine.state.value !is InferenceEngine.State.ModelReady) {
-                    error("The model is not ready. Return to chat and load a model first.")
+                    kotlin.error("The model is not ready. Return to chat and load a model first.")
                 }
                 if (modelPath.isNullOrBlank() || activeEngine.loadedModelPath != modelPath) {
-                    error("The selected model is not loaded. Return to chat and select it again.")
+                    kotlin.error("The selected model is not loaded. Return to chat and select it again.")
                 }
                 activeEngine.sendUserPrompt(cleanText, 512).collect { token ->
                     response += token
@@ -325,7 +325,8 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
                         val z1 = -dot.x * sa + dot.z * ca
                         val y2 = dot.y * tiltCos - z1 * tiltSin
                         val z2 = dot.y * tiltSin + z1 * tiltCos
-                        val motion = 1f + .03f * if (visualState == VoiceVisualState.IDLE || visualState == VoiceVisualState.THINKING) sin(time * 2f) else 0f +
+                        val pulse = if (visualState == VoiceVisualState.IDLE || visualState == VoiceVisualState.THINKING) .03f * sin(time * 2f) else 0f
+                        val motion = 1f + pulse +
                             ripple * level * sin(dot.y * 7f - time * 5f) +
                             jitter * level * dot.seed * .4f * sin(time * 8f + dot.phase)
                         val perspective = 1f + z2 * .22f
