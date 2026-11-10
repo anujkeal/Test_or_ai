@@ -382,31 +382,41 @@ static int decode_tokens_in_batches(
         const bool compute_last_logit = false) {
     // Process tokens in batches using the global batch
     LOGd("%s: Decode %d tokens starting at position %d", __func__, (int) tokens.size(), start_pos);
+    llama_pos position = start_pos;
+    const llama_pos max_position = DEFAULT_CONTEXT_SIZE - OVERFLOW_HEADROOM;
     for (int i = 0; i < (int) tokens.size(); i += BATCH_SIZE) {
         const int cur_batch_size = std::min((int) tokens.size() - i, BATCH_SIZE);
         batch.clear();
-        LOGv("%s: Preparing a batch size of %d starting at: %d", __func__, cur_batch_size, i);
+        LOGv("%s: Preparing a batch size of %d at token position %d", __func__, cur_batch_size, position);
 
-        // Shift context if current batch cannot fit into the context
-        if (start_pos + i + cur_batch_size >= DEFAULT_CONTEXT_SIZE - OVERFLOW_HEADROOM) {
+        // Context shifting changes the live position. Never keep using the stale
+        // start_pos + i offset after a shift, or llama.cpp receives invalid positions.
+        if (position + cur_batch_size > max_position) {
             LOGw("%s: Current batch won't fit into context! Shifting...", __func__);
+            current_position = position;
             shift_context();
+            position = current_position;
         }
-
-        // Add tokens to the batch with proper positions
-        for (int j = 0; j < cur_batch_size; j++) {
-            const llama_token token_id = tokens[i + j];
-            const llama_pos position = start_pos + i + j;
-            const bool want_logit = compute_last_logit && (i + j == tokens.size() - 1);
-            batch.add(token_id, position, 0, want_logit);
-        }
-
-        // Decode this batch
-        const int decode_result = llama_process(context, LLAMA_PROCESS_TYPE_DECODE, batch.get());
-        if (decode_result) {
-            LOGe("%s: llama_decode failed w/ %d", __func__, decode_result);
+        if (position + cur_batch_size > max_position) {
+            LOGe("%s: Prompt batch still exceeds context after shifting (position=%d, batch=%d)",
+                 __func__, position, cur_batch_size);
             return 1;
         }
+
+        for (int j = 0; j < cur_batch_size; j++) {
+            const llama_token token_id = tokens[i + j];
+            const llama_pos token_position = position + j;
+            const bool want_logit = compute_last_logit && (i + j == tokens.size() - 1);
+            batch.add(token_id, token_position, 0, want_logit);
+        }
+
+        const int decode_result = llama_process(context, LLAMA_PROCESS_TYPE_DECODE, batch.get());
+        if (decode_result) {
+            LOGe("%s: llama_decode failed w/ %d at position %d", __func__, decode_result, position);
+            return 1;
+        }
+        position += cur_batch_size;
+        current_position = position;
     }
     return 0;
 }
@@ -490,13 +500,13 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_processUserPrompt(
     }
 
     // Ensure user prompt doesn't exceed the context size by truncating if necessary.
-    const int user_prompt_size = (int) user_tokens.size();
     const int max_batch_size = DEFAULT_CONTEXT_SIZE - OVERFLOW_HEADROOM;
-    if (user_prompt_size > max_batch_size) {
-        const int skipped_tokens = user_prompt_size - max_batch_size;
+    if ((int) user_tokens.size() > max_batch_size) {
+        const int skipped_tokens = (int) user_tokens.size() - max_batch_size;
         user_tokens.resize(max_batch_size);
         LOGw("%s: User prompt too long! Skipped %d tokens!", __func__, skipped_tokens);
     }
+    const int user_prompt_size = (int) user_tokens.size();
 
     // Decode user tokens in batches
     if (decode_tokens_in_batches(g_context, g_batch, user_tokens, current_position, true)) {
@@ -504,8 +514,9 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_processUserPrompt(
         return 2;
     }
 
-    // Update position
-    current_position += user_prompt_size;
+    // decode_tokens_in_batches updates current_position after each successful batch.
+    // Do not add user_prompt_size again: that double-counts every prompt and causes
+    // premature context overflow on subsequent turns.
     stop_generation_position = current_position + n_predict;
     return 0;
 }
