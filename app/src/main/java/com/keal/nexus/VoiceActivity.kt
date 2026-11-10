@@ -8,6 +8,8 @@ import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.provider.Settings
+import android.provider.ContactsContract
+import android.net.Uri
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
@@ -84,6 +86,45 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
     var pendingTorchCommand by remember { mutableStateOf<String?>(null) }
     var frame by remember { mutableLongStateOf(0L) }
     var pointer by remember { mutableStateOf(Offset.Unspecified) }
+    var selectedCallName by remember { mutableStateOf<String?>(null) }
+    val voiceContactPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val requestedName = selectedCallName ?: "contact"
+        val contactUri = result.data?.data
+        if (result.resultCode == android.app.Activity.RESULT_OK && contactUri != null) {
+            val contact = runCatching {
+                context.contentResolver.query(contactUri,
+                    arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME, ContactsContract.CommonDataKinds.Phone.NUMBER),
+                    null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0).orEmpty() to cursor.getString(1).orEmpty() else null
+                }
+            }.getOrNull()
+            val number = contact?.second
+            if (!number.isNullOrBlank()) {
+                runCatching {
+                    context.startActivity(Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", number, null)))
+                    response = "Opened the dialer for ${contact.first.ifBlank { requestedName }}. Review the number and tap Call to confirm."
+                    caption = response
+                    status = "Ready for your confirmation"
+                    if (ttsReady) tts?.speak(response, TextToSpeech.QUEUE_FLUSH, null, "nexus-call")
+                }.onFailure {
+                    response = "I found the contact but could not open the dialer: ${it.message ?: "no dialer available"}"
+                    caption = response
+                    status = "Action failed"
+                }
+            } else {
+                response = "I could not read a phone number for that contact. Choose a contact with a saved number."
+                caption = response
+                status = "Contact number unavailable"
+            }
+        } else {
+            response = "Contact selection cancelled. No call was placed."
+            caption = response
+            status = "Cancelled"
+        }
+        selectedCallName = null
+        visualState = VoiceVisualState.IDLE
+    }
+
 
     val dots = remember {
         val random = Random(23)
@@ -132,6 +173,17 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
         caption = "Sending your words to NEXUS"
         scope.launch {
             try {
+                val callMatch = Regex("""^(?:please\s+)?(?:call|dial|phone)\s+(?:my\s+)?(.+)$""", RegexOption.IGNORE_CASE).matchEntire(cleanText)
+                if (callMatch != null) {
+                    val name = callMatch.groupValues[1].trim()
+                    selectedCallName = name
+                    response = "Choose $name from your contacts. I will open the dialer; you confirm the call there."
+                    caption = response
+                    status = "Choose a contact"
+                    voiceContactPicker.launch(Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI))
+                    return@launch
+                }
+
                 // Flashlight control requires Android's runtime CAMERA permission.
                 val torchCommand = cleanText.lowercase() in listOf(
                     "turn on flashlight", "turn on the flashlight", "switch on flashlight", "switch on the flashlight",
