@@ -667,7 +667,7 @@ private fun NexusChatApp(initialPath: String?) {
                                         val callMatch = Regex("^(?:please\\s+)?(?:call|dial|phone)\\s+(?:my\\s+)?(.+)$", RegexOption.IGNORE_CASE).matchEntire(prompt)
                                         val deviceActions = NexusDeviceActions(context.applicationContext)
                                         val androidControlEnabled = prefs.getBoolean("android_control_enabled", false)
-                                        val phoneAgentResult = if (PhoneControlAgent.isMultiStepGoal(prompt)) {
+                                        val phoneAgentResult = if (PhoneControlAgent.isMultiStepGoal(prompt) && !deviceActions.isSupportedDeviceRequest(prompt)) {
                                             if (!androidControlEnabled) {
                                                 "Phone control is disabled. Enable Android command control in NEXUS Settings first."
                                             } else if (!NexusAccessibilityService.isConnected()) {
