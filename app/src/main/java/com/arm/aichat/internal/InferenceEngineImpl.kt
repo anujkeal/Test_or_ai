@@ -118,6 +118,8 @@ internal class InferenceEngineImpl private constructor(
 
     private var _readyForSystemPrompt = false
     private var _systemPrompt: String? = null
+    @Volatile private var _loadedModelPath: String? = null
+    override val loadedModelPath: String? get() = _loadedModelPath
     @Volatile private var _nativeRuntimeLoaded = false
     @Volatile
     private var _cancelGeneration = false
@@ -186,6 +188,7 @@ internal class InferenceEngineImpl private constructor(
                 _readyForSystemPrompt = true
 
                 _cancelGeneration = false
+                _loadedModelPath = File(pathToModel).absolutePath
                 _state.value = InferenceEngine.State.ModelReady
             } catch (e: Exception) {
                 Log.e(TAG, (e.message ?: "Error loading model") + "\n" + pathToModel, e)
@@ -324,6 +327,7 @@ internal class InferenceEngineImpl private constructor(
 
                     unload()
                     _systemPrompt = null
+                    _loadedModelPath = null
 
                     _state.value = InferenceEngine.State.Initialized
                     Log.i(TAG, "Model unloaded!")
@@ -340,6 +344,7 @@ internal class InferenceEngineImpl private constructor(
                         try {
                             unload()
                             _systemPrompt = null
+                            _loadedModelPath = null
                             _state.value = InferenceEngine.State.Initialized
                             Log.i(TAG, "States reset!")
                         } catch (linkError: UnsatisfiedLinkError) {
