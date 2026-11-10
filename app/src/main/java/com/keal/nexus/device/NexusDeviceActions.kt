@@ -41,8 +41,7 @@ class NexusDeviceActions(private val context: Context) {
             lower.startsWith("launch ") -> lower.substringAfter("launch ").trim()
             else -> null
         }
-        return appName in setOf("youtube", "youtube music", "chrome", "whatsapp", "instagram",
-            "spotify", "maps", "google maps", "camera", "gallery", "settings", "calculator", "google", "google maps", "google map")
+        return !appName.isNullOrBlank()
     }
 
     fun execute(spoken: String): String? {
