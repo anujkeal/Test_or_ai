@@ -652,6 +652,8 @@ private fun NexusChatApp(initialPath: String?) {
                                         val deviceActions = NexusDeviceActions(context.applicationContext)
                                         val androidControlEnabled = prefs.getBoolean("android_control_enabled", false)
                                         val deviceResult = when {
+                                            toolRuntime.androidCommandHelpResponse(prompt) != null ->
+                                                toolRuntime.androidCommandHelpResponse(prompt)!!
                                             toolRuntime.detectAndroidCommand(prompt) != null && androidControlEnabled -> {
                                                 val commandCall = toolRuntime.detectAndroidCommand(prompt)!!
                                                 withContext(Dispatchers.IO) { toolRuntime.execute(commandCall) }
