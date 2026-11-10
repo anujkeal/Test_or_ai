@@ -257,7 +257,10 @@ internal class InferenceEngineImpl private constructor(
                     val resetResult = processSystemPrompt(_systemPrompt ?: "You are NEXUS, a helpful on-device AI assistant.")
                     if (resetResult == 0) _state.value = InferenceEngine.State.ModelReady
                     else throw IOException("Prompt failed ($result) and conversation reset failed ($resetResult).")
-                    throw IOException("Could not process your message. The conversation was reset; please try again.")
+                    if (result == 3) {
+                        throw IOException("Your message was too large for the remaining model context. NEXUS kept the newest part of the message and reset the conversation; try a shorter request.")
+                    }
+                    throw IOException("NEXUS could not fit this message into the model context. The conversation was reset safely; please try a shorter request.")
                 }
             }
 
