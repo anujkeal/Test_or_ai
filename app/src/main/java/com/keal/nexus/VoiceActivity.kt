@@ -44,6 +44,7 @@ import com.keal.nexus.agent.PhoneControlAgent
 import com.arm.aichat.AiChat
 import com.arm.aichat.InferenceEngine
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.*
@@ -194,6 +195,10 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
                     } else if (!NexusAccessibilityService.isConnected()) {
                         response = "Enable NEXUS app interaction in Android Settings → Accessibility to let the voice assistant read and control visible app screens."
                     } else {
+                        val activeEngine = engine ?: error("The inference engine is unavailable.")
+                        if (activeEngine.state.value !is InferenceEngine.State.ModelReady || modelPath.isNullOrBlank() || activeEngine.loadedModelPath != modelPath) {
+                            error("The selected local model is not ready. Return to chat and load it first.")
+                        }
                         val actionHistory = mutableListOf<String>()
                         var screen = NexusAccessibilityService.screenSnapshot()
                         var result: String? = null
@@ -263,8 +268,21 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
                             if (result == null) {
                                 step++
                                 status = "Phone control · step $step/8"
-                                delay(900)
-                                screen = NexusAccessibilityService.screenSnapshot()
+                                if (action.action == "open_app") {
+                                    var refreshed: String? = null
+                                    var attempts = 0
+                                    while (attempts < 7 && refreshed == null) {
+                                        delay(700)
+                                        val candidate = NexusAccessibilityService.screenSnapshot()
+                                        if (!candidate.isNullOrBlank() && !candidate.startsWith("App: com.keal.nexus")) refreshed = candidate
+                                        attempts++
+                                    }
+                                    screen = refreshed
+                                    if (screen.isNullOrBlank()) result = "I opened the app but could not verify its screen through Accessibility."
+                                } else {
+                                    delay(900)
+                                    screen = NexusAccessibilityService.screenSnapshot()
+                                }
                             }
                         }
                         response = result ?: "I stopped after 8 actions to keep phone control bounded."
