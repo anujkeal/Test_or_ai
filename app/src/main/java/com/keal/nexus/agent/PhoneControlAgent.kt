@@ -23,7 +23,8 @@ object PhoneControlAgent {
         val value = prompt.trim().lowercase()
         val hasAction = listOf("open ", "launch ", "search ", "play ", "find ", "tap ", "click ", "type ", "scroll ", "navigate ").any(value::contains)
         val hasSequence = listOf(" and ", " then ", "after that").any(value::contains)
-        return value.startsWith("use phone control") || value.startsWith("control my phone") ||\n            (hasAction && hasSequence && !value.startsWith("call ") && !value.startsWith("dial ") && !value.startsWith("phone "))
+        return value.startsWith("use phone control") || value.startsWith("control my phone") ||
+            (hasAction && hasSequence && !value.startsWith("call ") && !value.startsWith("dial ") && !value.startsWith("phone "))
     }
 
     fun stepPrompt(goal: String, history: List<String>, screen: String): String = buildString {
