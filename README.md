@@ -1,3 +1,12 @@
+## V0.12.0 — Filtered Android agent
+
+- Adds opt-in Android command control in Settings, disabled by default
+- Adds structured, allowlisted AI actions for launching supported apps, YouTube search, Android navigation, scrolling, and flashlight control
+- Validates tool names, exact argument keys, enum values, and bounded YouTube query length before execution
+- Does not expose a shell, arbitrary CMD, root, package installation, messaging send, payment, or destructive device actions
+- Accessibility-dependent actions require the user to separately enable the NEXUS Accessibility Service in Android Settings
+- Stores a bounded local history of the most recent Android action results
+
 ## V0.11.2 — Bounded file generation
 
 - File-content generation is limited to 256 tokens and a 2-minute collection timeout, with an explicit timeout error instead of an indefinite thinking indicator
