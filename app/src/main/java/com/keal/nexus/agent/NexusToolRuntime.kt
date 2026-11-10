@@ -5,6 +5,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 data class NexusToolCall(val name: String, val arguments: JSONObject)
+data class WorkspaceIntent(val action: Action, val fileName: String? = null) {
+    enum class Action { LIST, READ, PATH, WRITE, DELETE }
+}
 
 class NexusToolRuntime(context: Context) {
     private val workspace = WorkspaceStore(context.applicationContext)
@@ -30,6 +33,63 @@ class NexusToolRuntime(context: Context) {
             append("If no tool is needed, answer normally. Do not invent file names, file contents, or access permissions.")
         }
     }
+
+    fun detectWorkspaceIntent(prompt: String): WorkspaceIntent? {
+        val text = prompt.trim()
+        if (text.isEmpty()) return null
+        val fileName = Regex("""([A-Za-z0-9_.-]+\\.(?:html?|css|js|json|txt|md|py|kt))""", RegexOption.IGNORE_CASE)
+            .find(text)?.groupValues?.get(1)
+        val lower = text.lowercase()
+        val mentionsFiles = listOf("file", "files", "folder", "workspace", "document").any { it in lower }
+        if ((("where is" in lower || "what is" in lower || "show me the path" in lower || "path of" in lower || "location of" in lower) && fileName != null)) {
+            return WorkspaceIntent(WorkspaceIntent.Action.PATH, fileName)
+        }
+        if (fileName != null && listOf("read ", "open ", "contents of", "show contents").any { it in lower }) {
+            return WorkspaceIntent(WorkspaceIntent.Action.READ, fileName)
+        }
+        if ((listOf("list", "show", "what", "which").any { lower.startsWith(it) } &&
+                listOf("file", "files", "folder", "workspace").any { it in lower }) ||
+            "list workspace" in lower || "list files" in lower
+        ) return WorkspaceIntent(WorkspaceIntent.Action.LIST)
+        if (fileName != null && listOf("create", "make", "generate", "write", "save", "build").any { it in lower }) {
+            return WorkspaceIntent(WorkspaceIntent.Action.WRITE, fileName)
+        }
+        if (fileName != null && listOf("delete", "remove").any { it in lower }) {
+            return WorkspaceIntent(WorkspaceIntent.Action.DELETE, fileName)
+        }
+        return if (mentionsFiles && fileName == null && ("list" in lower || "show" in lower)) {
+            WorkspaceIntent(WorkspaceIntent.Action.LIST)
+        } else null
+    }
+
+    fun contentGenerationPrompt(originalRequest: String, fileName: String): String =
+        "Create the complete contents for the file $fileName requested by the user. " +
+            "Return ONLY the file contents, with no explanation, no markdown code fences, no JSON tool call, " +
+            "and no claim that the file has been saved. Preserve the user's requested purpose. " +
+            "If it is an HTML file, return a complete valid HTML document with doctype, html, head, title, body, and responsive viewport. " +
+            "Original request: $originalRequest"
+
+    fun cleanGeneratedFileContent(output: String): String {
+        val trimmed = output.trim()
+        val fenced = Regex("^\\x60{3}[^\\n]*\\n([\\s\\S]*?)\\n\\x60{3}$").find(trimmed)
+        return (fenced?.groupValues?.get(1) ?: trimmed).trim()
+    }
+
+    fun callFor(action: WorkspaceIntent.Action, fileName: String? = null, content: String = ""): NexusToolCall? {
+        val name = when (action) {
+            WorkspaceIntent.Action.LIST -> "workspace.list_files"
+            WorkspaceIntent.Action.READ -> "workspace.read_file"
+            WorkspaceIntent.Action.WRITE -> "workspace.write_file"
+            WorkspaceIntent.Action.DELETE -> "workspace.delete_file"
+            WorkspaceIntent.Action.PATH -> return null
+        }
+        val args = JSONObject()
+        if (fileName != null) args.put("name", fileName)
+        if (action == WorkspaceIntent.Action.WRITE) args.put("content", content)
+        return NexusToolCall(name, args)
+    }
+
+    fun describePath(fileName: String): String = workspace.describeFilePath(fileName)
 
     fun parseToolCall(output: String): NexusToolCall? {
         val json = extractFirstJsonObject(output) ?: return null
