@@ -95,7 +95,7 @@ class NexusAccessibilityService : AccessibilityService() {
 
         fun armYouTubeAutoplay(): Boolean {
             val service = active ?: return false
-            service.pendingYouTubeAutoplay = true
+            pendingYouTubeAutoplay = true
             return true
         }
     }
