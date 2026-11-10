@@ -146,6 +146,29 @@ class NexusToolRuntime(context: Context) {
         return NexusToolCall(name, args)
     }
 
+    fun androidCommandHelpResponse(prompt: String): String? {
+        val text = prompt.trim().lowercase()
+        val asksAboutCapabilities =
+            (("what" in text || "which" in text || "tell me" in text || "explain" in text) &&
+                ("can you do" in text || "can do" in text || "capabilit" in text || "commands" in text || "command prompt" in text) &&
+                ("android" in text || "cmd" in text || "command" in text || "terminal" in text))
+        if (!asksAboutCapabilities) return null
+
+        return """
+            I can perform a limited set of safe actions on your Android phone:
+
+            **Device information:** check the current folder, list the app's private files, show the date, identify the app's Android user, show Android/kernel information, uptime, storage usage, phone model and Android version.
+
+            **Phone actions (when Android control is enabled):** open supported apps such as YouTube, Chrome, WhatsApp, Maps, Camera and Settings; search YouTube for a song or video; use Back/Home, open notifications or quick settings, scroll, and control the flashlight.
+
+            **Workspace:** list, read and create files in the folder you explicitly select and grant access to. File creation and deletion require confirmation.
+
+            **Important limits:** this is not a full Windows CMD, Termux or ADB terminal. I do not have root access and cannot run arbitrary shell commands, install apps, delete phone data, or bypass Android permissions. I will only run actions that pass NEXUS's allowlist and permission checks.
+
+            Try: "Open YouTube", "Search YouTube for Enemy by Imagine Dragons", "Turn on flashlight", "Show my Android version", or "List my workspace files".
+        """.trimIndent()
+    }
+
     fun detectAndroidCommand(prompt: String): NexusToolCall? {
         val text = prompt.trim().lowercase()
         val commands = setOf("pwd", "ls", "date", "id", "uname", "uptime", "df")
