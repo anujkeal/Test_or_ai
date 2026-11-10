@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.keal.nexus.device.NexusDeviceActions
+import com.keal.nexus.device.NexusAccessibilityService
+import com.keal.nexus.agent.PhoneControlAgent
 import com.arm.aichat.AiChat
 import com.arm.aichat.InferenceEngine
 import kotlinx.coroutines.Dispatchers
@@ -181,6 +183,96 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
                     caption = response
                     status = "Choose a contact"
                     voiceContactPicker.launch(Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI))
+                    return@launch
+                }
+
+                if (PhoneControlAgent.isMultiStepGoal(cleanText)) {
+                    val controlEnabled = context.getSharedPreferences("nexus_preferences", android.content.Context.MODE_PRIVATE)
+                        .getBoolean("android_control_enabled", false)
+                    if (!controlEnabled) {
+                        response = "Phone control is disabled. Enable Android command control in NEXUS Settings first."
+                    } else if (!NexusAccessibilityService.isConnected()) {
+                        response = "Enable NEXUS app interaction in Android Settings → Accessibility to let the voice assistant read and control visible app screens."
+                    } else {
+                        val actionHistory = mutableListOf<String>()
+                        var screen = NexusAccessibilityService.screenSnapshot()
+                        var result: String? = null
+                        var step = 0
+                        while (step < 8 && result == null) {
+                            if (screen.isNullOrBlank()) {
+                                result = "I cannot read the current screen. Check NEXUS Accessibility permission."
+                                break
+                            }
+                            val rawAction = StringBuilder()
+                            kotlinx.coroutines.withTimeout(30_000L) {
+                                activeEngine.sendUserPrompt(
+                                    PhoneControlAgent.stepPrompt(cleanText, actionHistory, screen),
+                                    160
+                                ).collect { token -> rawAction.append(token) }
+                            }
+                            val action = PhoneControlAgent.parse(rawAction.toString())
+                            if (action == null) {
+                                result = "I couldn't get a valid one-action instruction from the model. Please try again."
+                                break
+                            }
+                            val summary = when (action.action) {
+                                "open_app" -> "open_app ${action.name}"
+                                "click" -> "click ${action.id}"
+                                "type" -> "type ${action.id}"
+                                "scroll" -> "scroll ${action.direction}"
+                                else -> action.action
+                            }
+                            if (actionHistory.lastOrNull()?.substringBefore(" -> ") == summary) {
+                                result = "I stopped because the model repeated the previous action."
+                                break
+                            }
+                            when (action.action) {
+                                "done" -> result = "Completed: $cleanText"
+                                "fail" -> result = action.reason ?: "The phone agent could not continue."
+                                "open_app" -> {
+                                    val opened = NexusDeviceActions(context.applicationContext).execute("open ${action.name}")
+                                    if (opened == null || opened.startsWith("I couldn't", true) || opened.startsWith("I could not", true)) {
+                                        result = opened ?: "I couldn't open that app."
+                                    } else actionHistory += "$summary -> $opened"
+                                }
+                                "click" -> {
+                                    val id = action.id!!
+                                    val line = screen.lineSequence().firstOrNull { it.substringBefore(":").trim().toIntOrNull() == id }
+                                    val label = line?.substringAfter(":")?.substringBefore(" [")?.trim().orEmpty()
+                                    if (line == null) result = "That screen id is no longer available."
+                                    else if (PhoneControlAgent.isSensitiveTarget(label)) result = "That control needs your confirmation. Please tap it yourself."
+                                    else if (!NexusAccessibilityService.clickScreenElement(id)) result = "I couldn't tap that screen item."
+                                    else actionHistory += "$summary -> tapped $label"
+                                }
+                                "type" -> {
+                                    val id = action.id!!
+                                    val line = screen.lineSequence().firstOrNull { it.substringBefore(":").trim().toIntOrNull() == id }
+                                    if (line == null || "[text field]" !in line) result = "That id is not an editable text field."
+                                    else if (!NexusAccessibilityService.typeScreenElement(id, action.text.orEmpty())) result = "I couldn't type into that field."
+                                    else actionHistory += "$summary -> typed text"
+                                }
+                                "scroll" -> {
+                                    if (!NexusAccessibilityService.scroll(action.direction.orEmpty())) result = "I couldn't find a scrollable area."
+                                    else actionHistory += "$summary -> completed"
+                                }
+                                "back" -> {
+                                    if (!NexusAccessibilityService.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)) result = "Android Back is unavailable."
+                                    else actionHistory += "$summary -> completed"
+                                }
+                            }
+                            if (result == null) {
+                                step++
+                                status = "Phone control · step $step/8"
+                                delay(900)
+                                screen = NexusAccessibilityService.screenSnapshot()
+                            }
+                        }
+                        response = result ?: "I stopped after 8 actions to keep phone control bounded."
+                    }
+                    caption = response
+                    status = "NEXUS phone control"
+                    visualState = if (ttsReady) VoiceVisualState.SPEAKING else VoiceVisualState.IDLE
+                    if (ttsReady) tts?.speak(response, TextToSpeech.QUEUE_FLUSH, null, "nexus-phone-agent")
                     return@launch
                 }
 
