@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.keal.nexus.device.NexusDeviceActions
 import com.arm.aichat.AiChat
 import com.arm.aichat.InferenceEngine
 import kotlinx.coroutines.Dispatchers
@@ -111,6 +112,20 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
         caption = "Sending your words to NEXUS"
         scope.launch {
             try {
+                // Deterministic, allow-listed device actions run before asking the local model.
+                val deviceResult = NexusDeviceActions(context.applicationContext).execute(cleanText)
+                if (deviceResult != null) {
+                    response = deviceResult
+                    caption = deviceResult
+                    status = "NEXUS action"
+                    visualState = VoiceVisualState.SPEAKING
+                    if (ttsReady) {
+                        tts?.speak(deviceResult, TextToSpeech.QUEUE_FLUSH, null, "nexus-device-action")
+                    } else {
+                        visualState = VoiceVisualState.IDLE
+                    }
+                    return@launch
+                }
                 val activeEngine = engine ?: kotlin.error("The inference engine is unavailable.")
                 if (activeEngine.state.value !is InferenceEngine.State.ModelReady) {
                     kotlin.error("The model is not ready. Return to chat and load a model first.")
