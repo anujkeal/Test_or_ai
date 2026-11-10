@@ -146,6 +146,20 @@ class NexusToolRuntime(context: Context) {
         return NexusToolCall(name, args)
     }
 
+    fun detectAndroidCommand(prompt: String): NexusToolCall? {
+        val text = prompt.trim().lowercase()
+        val commands = setOf("pwd", "ls", "date", "id", "uname", "uptime", "df")
+        val match = Regex("""^(?:(?:please\\s+)?(?:run|execute)\\s+(?:the\\s+)?(?:cmd\\s+)?|(?:use\\s+cmd\\s+to\\s+run\\s+)|cmd\\s+)(pwd|ls|date|id|uname|uptime|df)$""")
+            .matchEntire(text)
+        val command = match?.groupValues?.get(1) ?: when (text) {
+            "what is my device model", "show device model", "get device model" -> "device_model"
+            "what android version is this", "show android version", "get android version" -> "android_version"
+            else -> null
+        }
+        if (command !in commands && command !in setOf("device_model", "android_version")) return null
+        return NexusToolCall("android.run_command", JSONObject().put("command", command))
+    }
+
     fun describePath(fileName: String): String = workspace.describeFilePath(fileName)
 
     fun parseToolCall(output: String): NexusToolCall? {
