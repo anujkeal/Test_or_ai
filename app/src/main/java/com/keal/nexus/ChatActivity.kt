@@ -213,7 +213,7 @@ private fun NexusChatApp(initialPath: String?) {
                 // Rebuild the model's in-memory context from the active locally saved transcript.
                 val priorTurns = messages.filter { it.user }.takeLast(8)
                 priorTurns.forEach { turn ->
-                    local.sendUserPrompt(turn.text, 512).collect()
+                    local.sendUserPrompt(turn.text, 512).collect { }
                 }
             }
             ready = true
@@ -291,7 +291,7 @@ private fun NexusChatApp(initialPath: String?) {
                 try {
                     engine?.resetConversation(NEXUS_SYSTEM_PROMPT)
                     chat.messages.filter { it.user }.takeLast(8).forEach { turn ->
-                        engine?.sendUserPrompt(turn.text, 512)?.collect()
+                        engine?.sendUserPrompt(turn.text, 512)?.collect { }
                     }
                     ready = true
                 } catch (t: Throwable) {
