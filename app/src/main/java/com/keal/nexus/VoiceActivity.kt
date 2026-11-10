@@ -99,6 +99,24 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
         while (true) withFrameNanos { frame = it }
     }
 
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val command = pendingTorchCommand
+        pendingTorchCommand = null
+        if (granted && command != null) {
+            val result = NexusDeviceActions(context.applicationContext).execute(command)
+                ?: "I couldn't complete that device action."
+            response = result
+            caption = result
+            status = "NEXUS action"
+            visualState = if (ttsReady) VoiceVisualState.SPEAKING else VoiceVisualState.IDLE
+            if (ttsReady) tts?.speak(result, TextToSpeech.QUEUE_FLUSH, null, "nexus-device-action")
+        } else if (!granted) {
+            error = "Camera permission is required to control the flashlight. You can allow it in Android app settings."
+            caption = error.orEmpty()
+            status = "Permission needed"
+        }
+    }
+
     fun submitRecognizedSpeech(spokenText: String) {
         val cleanText = spokenText.trim()
         if (cleanText.isEmpty()) {
@@ -259,24 +277,6 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
             error = "Microphone permission was denied. Allow it in Android app settings to use voice."
             status = "Microphone permission needed"
             caption = error.orEmpty()
-        }
-    }
-
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        val command = pendingTorchCommand
-        pendingTorchCommand = null
-        if (granted && command != null) {
-            val result = NexusDeviceActions(context.applicationContext).execute(command)
-                ?: "I couldn't complete that device action."
-            response = result
-            caption = result
-            status = "NEXUS action"
-            visualState = if (ttsReady) VoiceVisualState.SPEAKING else VoiceVisualState.IDLE
-            if (ttsReady) tts?.speak(result, TextToSpeech.QUEUE_FLUSH, null, "nexus-device-action")
-        } else if (!granted) {
-            error = "Camera permission is required to control the flashlight. You can allow it in Android app settings."
-            caption = error.orEmpty()
-            status = "Permission needed"
         }
     }
 
