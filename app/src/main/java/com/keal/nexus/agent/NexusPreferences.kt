@@ -9,6 +9,9 @@ class NexusPreferences(context: Context) {
         get() = store.getString("assistant_name", "NEXUS") ?: "NEXUS"
         set(value) { store.edit().putString("assistant_name", value.trim().take(32).ifBlank { "NEXUS" }).apply() }
     fun isToolAllowed(tool: String): Boolean = store.getStringSet("allowed_tools", DEFAULT_READ_ONLY_TOOLS)?.contains(tool) == true
+    var androidControlEnabled: Boolean
+        get() = store.getBoolean("android_control_enabled", false)
+        set(value) { store.edit().putBoolean("android_control_enabled", value).apply() }
     fun setToolAllowed(tool: String, allowed: Boolean) {
         val updated = store.getStringSet("allowed_tools", DEFAULT_READ_ONLY_TOOLS).orEmpty().toMutableSet()
         if (allowed) updated.add(tool) else updated.remove(tool)
