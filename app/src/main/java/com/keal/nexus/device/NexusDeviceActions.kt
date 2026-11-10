@@ -14,6 +14,37 @@ import java.net.URLEncoder
  * External-app operations are limited to explicit, user-spoken commands.
  */
 class NexusDeviceActions(private val context: Context) {
+    fun isUnrestrictedShellRequest(spoken: String): Boolean {
+        val lower = spoken.trim().lowercase()
+        return Regex("""\\b(cmd|command prompt|powershell|adb shell|run shell|execute shell|terminal command|run command|execute command)\\b""")
+            .containsMatchIn(lower)
+    }
+
+    fun isSupportedDeviceRequest(spoken: String): Boolean {
+        val lower = spoken.trim().lowercase()
+        if (lower.isBlank()) return false
+        if (lower in setOf("go back", "press back", "navigate back", "go home", "press home",
+                "open home screen", "open notifications", "show notifications",
+                "open quick settings", "show quick settings", "scroll down", "scroll up",
+                "turn on flashlight", "switch on flashlight", "enable flashlight",
+                "turn off flashlight", "switch off flashlight", "disable flashlight",
+                "pause music", "resume music", "next song", "previous song", "play music",
+                "play local music", "open local music", "play music from my phone", "choose local song")) return true
+        if (lower.startsWith("type ") || lower.startsWith("confirm tap ") ||
+            lower.startsWith("set a timer for ") || lower.startsWith("start a timer for ")) return true
+        if (Regex("""^(?:set|create) (?:an? )?alarm for \\d{1,2}(?::\\d{2})?\\s*(?:am|pm)?$""").matches(lower)) return true
+        if (Regex("""^(?:(?:please\\s+)?(?:open|launch|start)\\s+youtube\\s+(?:and\\s+)?(?:play|search(?:\\s+for)?)\\s+|(?:play|search\\s+for\\s+).+?)(?:\\s+(?:song|video)\\s+on\\s+youtube)?$""").matches(lower)) return true
+        if (lower.startsWith("search youtube for ") || lower.startsWith("find on youtube ") ||
+            (lower.startsWith("play ") && lower !in setOf("play music", "play local music"))) return true
+        val appName = when {
+            lower.startsWith("open ") -> lower.substringAfter("open ").trim()
+            lower.startsWith("launch ") -> lower.substringAfter("launch ").trim()
+            else -> null
+        }
+        return appName in setOf("youtube", "youtube music", "chrome", "whatsapp", "instagram",
+            "spotify", "maps", "google maps", "camera", "gallery", "settings", "calculator")
+    }
+
     fun execute(spoken: String): String? {
         val command = spoken.trim()
         val lower = command.lowercase()
