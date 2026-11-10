@@ -13,6 +13,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -110,12 +112,15 @@ private fun VoiceVisualizerScreen(onClose: () -> Unit) {
     val targetJitter = if (visualState == VoiceVisualState.LISTENING) .55f else 0f
     val pulse = if (visualState == VoiceVisualState.IDLE || visualState == VoiceVisualState.THINKING) .03f else 0f
     val level = max(0f, .5f + .5f * sin(time * 7.3f) * sin(time * 2.9f + 1f))
-    val reduced = .35f
-    val angle = time * targetSpeed
-    val radius = targetRadius
-    val twist = targetTwist
-    val ripple = targetRipple
-    val jitter = targetJitter
+    val speed = animateFloatAsState(targetSpeed, tween(300), label = "sphereSpeed").value
+    val radius = animateFloatAsState(targetRadius, tween(300), label = "sphereRadius").value
+    val twist = animateFloatAsState(targetTwist, tween(300), label = "sphereTwist").value
+    val ripple = animateFloatAsState(targetRipple, tween(300), label = "sphereRipple").value
+    val jitter = animateFloatAsState(targetJitter, tween(300), label = "sphereJitter").value
+    // The source HTML advances rotation once per animation frame (~60 fps).
+    val angle = time * speed * 60f
+    val offsetX = remember { FloatArray(1800) }
+    val offsetY = remember { FloatArray(1800) }
 
     Surface(color = bg, modifier = Modifier.fillMaxSize()) {
         Column(
@@ -158,7 +163,7 @@ private fun VoiceVisualizerScreen(onClose: () -> Unit) {
                     val baseRadius = size * radius * .5f
                     val tiltCos = cos(.35f)
                     val tiltSin = sin(.35f)
-                    dots.forEach { dot ->
+                    dots.forEachIndexed { index, dot ->
                         val a = angle + twist * dot.y * sin(time * 1.3f)
                         val ca = cos(a)
                         val sa = sin(a)
@@ -170,19 +175,27 @@ private fun VoiceVisualizerScreen(onClose: () -> Unit) {
                             ripple * level * sin(dot.y * 7f - time * 5f) +
                             jitter * level * dot.seed * .4f * sin(time * 8f + dot.phase)
                         val perspective = 1f + z2 * .22f
-                        val x = cx + x1 * motion * baseRadius * perspective
-                        val y = cy + y2 * motion * baseRadius * perspective
-                        val alpha = (.18f + .82f * (z2 * .5f + .5f)).coerceIn(.12f, 1f)
-                        val dotSize = (.7f + dot.seed * .9f) * perspective
-                        drawCircle(ink.copy(alpha = alpha), radius = dotSize.coerceAtLeast(.35f), center = Offset(x, y))
+                        var x = cx + x1 * motion * baseRadius * perspective + offsetX[index]
+                        var y = cy + y2 * motion * baseRadius * perspective + offsetY[index]
                         if (pointer.isSpecified) {
                             val dx = x - pointer.x
                             val dy = y - pointer.y
-                            if (dx * dx + dy * dy < 7000f) {
-                                // Pointer displacement is represented by a local radial highlight.
-                                drawCircle(accent.copy(alpha = .08f), radius = 2.2f, center = Offset(x, y))
+                            val distanceSquared = dx * dx + dy * dy
+                            if (distanceSquared < 7000f) {
+                                val distance = sqrt(distanceSquared) + .01f
+                                val force = (84f - distance) / 84f
+                                offsetX[index] += dx / distance * force * 7f
+                                offsetY[index] += dy / distance * force * 7f
                             }
                         }
+                        offsetX[index] *= .9f
+                        offsetY[index] *= .9f
+                        x = cx + x1 * motion * baseRadius * perspective + offsetX[index]
+                        y = cy + y2 * motion * baseRadius * perspective + offsetY[index]
+                        val alpha = (.18f + .82f * (z2 * .5f + .5f)).coerceIn(.12f, 1f)
+                        val dotSize = (.7f + dot.seed * .9f) * perspective
+                        drawCircle(ink.copy(alpha = alpha), radius = dotSize.coerceAtLeast(.35f), center = Offset(x, y))
+
                     }
                 }
             }
