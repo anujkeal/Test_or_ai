@@ -8,9 +8,9 @@ class NexusPreferences(context: Context) {
     var assistantName: String
         get() = store.getString("assistant_name", "NEXUS") ?: "NEXUS"
         set(value) { store.edit().putString("assistant_name", value.trim().take(32).ifBlank { "NEXUS" }).apply() }
-    fun isToolAllowed(tool: String): Boolean = store.getStringSet("allowed_tools", emptySet())?.contains(tool) == true
+    fun isToolAllowed(tool: String): Boolean = store.getStringSet("allowed_tools", DEFAULT_READ_ONLY_TOOLS)?.contains(tool) == true
     fun setToolAllowed(tool: String, allowed: Boolean) {
-        val updated = store.getStringSet("allowed_tools", emptySet()).orEmpty().toMutableSet()
+        val updated = store.getStringSet("allowed_tools", DEFAULT_READ_ONLY_TOOLS).orEmpty().toMutableSet()
         if (allowed) updated.add(tool) else updated.remove(tool)
         store.edit().putStringSet("allowed_tools", updated).apply()
     }
@@ -18,5 +18,6 @@ class NexusPreferences(context: Context) {
     fun denyAll() { store.edit().putStringSet("allowed_tools", emptySet()).apply() }
     companion object {
         val WORKSPACE_TOOLS = listOf("workspace.list_files", "workspace.read_file", "workspace.write_file", "workspace.delete_file")
+        private val DEFAULT_READ_ONLY_TOOLS = setOf("workspace.list_files", "workspace.read_file")
     }
 }
