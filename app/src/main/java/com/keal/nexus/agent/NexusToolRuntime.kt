@@ -45,6 +45,9 @@ class NexusToolRuntime(context: Context) {
         }.getOrNull()
     }
 
+    fun isAllowed(call: NexusToolCall): Boolean =
+        workspace.selectedTreeUri() != null && preferences.isToolAllowed(call.name)
+
     fun execute(call: NexusToolCall, userApproved: Boolean = false): String {
         val result = registry.callTool(call.name, call.arguments, userApproved)
         val content = result.optJSONArray("content")
