@@ -1,3 +1,11 @@
+## V0.11.1 — Workspace file generation and YouTube playback
+
+- Detect common language requests such as "create a Python file" and infer practical filenames
+- Accept explicitly named files with arbitrary text-based extensions, not only the original small extension allow-list
+- Generate extension-appropriate source/configuration contents and retain per-file write approval
+- When NEXUS app interaction Accessibility is enabled, attempt a one-shot click on the first YouTube video-title node after an explicit play request; otherwise open search results and ask the user to tap a result
+- YouTube first-result playback is best-effort because YouTube's accessibility view hierarchy can change; NEXUS does not promise playback when no matching node is exposed
+
 ## V0.11.0 — Voice device actions and optional Accessibility
 
 - Add a deterministic allow-listed Android action router before local model inference in Voice mode
