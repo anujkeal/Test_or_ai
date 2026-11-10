@@ -583,8 +583,14 @@ private fun NexusChatApp(initialPath: String?) {
                                         val workspaceIntent = toolRuntime.detectWorkspaceIntent(prompt)
                                         if (workspaceIntent != null) {
                                             val intentResult = when (workspaceIntent.action) {
-                                                com.keal.nexus.agent.WorkspaceIntent.Action.PATH -> withContext(Dispatchers.IO) {
-                                                    toolRuntime.describePath(workspaceIntent.fileName ?: error("A file name is required."))
+                                                com.keal.nexus.agent.WorkspaceIntent.Action.PATH -> {
+                                                    val listCall = toolRuntime.callFor(com.keal.nexus.agent.WorkspaceIntent.Action.LIST)
+                                                        ?: error("Could not prepare the workspace path lookup.")
+                                                    if (!toolRuntime.isAllowed(listCall)) {
+                                                        "I cannot inspect workspace paths until a folder is selected and workspace.list_files is enabled."
+                                                    } else withContext(Dispatchers.IO) {
+                                                        toolRuntime.describePath(workspaceIntent.fileName ?: error("A file name is required."))
+                                                    }
                                                 }
                                                 com.keal.nexus.agent.WorkspaceIntent.Action.LIST,
                                                 com.keal.nexus.agent.WorkspaceIntent.Action.READ -> {
