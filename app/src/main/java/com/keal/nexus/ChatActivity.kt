@@ -54,6 +54,8 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.TimeoutCancellationException
 import java.io.File
 import java.io.IOException
 import java.util.UUID
@@ -634,7 +636,9 @@ private fun NexusChatApp(initialPath: String?) {
                     Surface(
                         onClick = {
                             val prompt = input.trim()
-                            if (prompt.isNotEmpty() && ready && !generating) {
+                            if (generating) {
+                                generationJob?.cancel()
+                            } else if (prompt.isNotEmpty() && ready) {
                                 input = ""
                                 messages.add(ChatMessage(true, prompt))
                                 messages.add(ChatMessage(false, ""))
@@ -688,10 +692,17 @@ private fun NexusChatApp(initialPath: String?) {
                                                         "I did not create the file. Select a workspace folder and enable workspace.write_file in Workspace permissions, then try again."
                                                     } else {
                                                         val rawContent = StringBuilder()
-                                                        activeEngine.sendUserPrompt(
-                                                            toolRuntime.contentGenerationPrompt(prompt, fileName),
-                                                            768
-                                                        ).collect { token -> rawContent.append(token) }
+                                                        try {
+                                                            withTimeout(120_000L) {
+                                                                activeEngine.sendUserPrompt(
+                                                                    toolRuntime.contentGenerationPrompt(prompt, fileName),
+                                                                    256
+                                                                ).collect { token -> rawContent.append(token) }
+                                                            }
+                                                        } catch (timeout: TimeoutCancellationException) {
+                                                            runCatching { activeEngine.resetConversation(toolRuntime.systemPrompt()) }
+                                                            throw IOException("File generation timed out after 2 minutes. NEXUS stopped the request instead of leaving it spinning. Try a smaller model or a shorter file request.")
+                                                        }
                                                         val generatedContent = toolRuntime.cleanGeneratedFileContent(rawContent.toString())
                                                         val looksLikeHtml = fileName.endsWith(".html", true) || fileName.endsWith(".htm", true)
                                                         if (generatedContent.isBlank() ||
@@ -774,7 +785,11 @@ private fun NexusChatApp(initialPath: String?) {
                                         }
                                         }
                                         }
+                                    } catch (timeout: TimeoutCancellationException) {
+                                        if (messages.isNotEmpty()) messages[messages.lastIndex] =
+                                            ChatMessage(false, "NEXUS stopped this request because generation took too long. Please try again with a shorter request or a smaller model.")
                                     } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                        if (messages.isNotEmpty() && messages.last().text.isBlank()) messages.removeAt(messages.lastIndex)
                                         throw cancelled
                                     } catch (t: Throwable) {
                                         if (messages.isNotEmpty() && messages.last().text.isBlank()) messages.removeAt(messages.lastIndex)
@@ -793,7 +808,7 @@ private fun NexusChatApp(initialPath: String?) {
                         modifier = Modifier.size(58.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text("↑", color = if (ready && input.isNotBlank() && !generating) Color.White else mutedText, fontSize = 28.sp, fontWeight = FontWeight.Medium)
+                            Text(if (generating) "×" else "↑", color = if (generating) Color(0xFFE36B79) else if (ready && input.isNotBlank()) Color.White else mutedText, fontSize = 28.sp, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
