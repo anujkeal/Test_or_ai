@@ -42,6 +42,21 @@ class NexusDeviceActions(private val context: Context) {
             return if (NexusAccessibilityService.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS)) "Opening quick settings." else "Enable NEXUS app interaction in Accessibility settings first."
         }
 
+        if (lower == "scroll down" || lower == "scroll up") {
+            val direction = if (lower.endsWith("down")) "down" else "up"
+            return if (NexusAccessibilityService.scroll(direction)) "Scrolled $direction." else "I couldn't find a scrollable area. Open the app and enable NEXUS app interaction in Accessibility settings."
+        }
+        if (lower.startsWith("type ")) {
+            val text = command.substringAfter("type ").trim()
+            if (text.isBlank()) return "Tell me what to type."
+            return if (NexusAccessibilityService.typeIntoFocusedField(text)) "Typed your text into the focused field." else "I couldn't find an editable text field. Tap the field first, then say: type followed by your text."
+        }
+        if (lower.startsWith("confirm tap ")) {
+            val label = command.substringAfter("confirm tap ").trim()
+            if (label.isBlank()) return "Tell me which visible control to tap."
+            return if (NexusAccessibilityService.tapVisibleText(label)) "Tapped the visible control labelled $label." else "I couldn't find a tappable control labelled $label. Make sure the app is open and NEXUS app interaction is enabled."
+        }
+
         val alarmMatch = Regex("(?:set|create) (?:an? )?alarm for (\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)?", RegexOption.IGNORE_CASE).find(command)
         if (alarmMatch != null) {
             var hour = alarmMatch.groupValues[1].toIntOrNull() ?: return "I couldn't understand that alarm time."
