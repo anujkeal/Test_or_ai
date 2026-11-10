@@ -12,8 +12,8 @@ android {
         applicationId = "com.keal.nexus"
         minSdk = 26
         targetSdk = 35
-        versionCode = 23
-        versionName = "0.12.0"
+        versionCode = 24
+        versionName = "0.12.1"
         ndk { abiFilters += listOf("arm64-v8a") }
         externalNativeBuild { cmake { cppFlags += "-std=c++17"; arguments += "-DCMAKE_BUILD_TYPE=Release" } }
     }
