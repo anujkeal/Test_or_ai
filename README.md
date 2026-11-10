@@ -4,10 +4,14 @@
 
 NEXUS AI is an Android-first, on-device AI chat app built with Kotlin, Jetpack Compose and llama.cpp. It runs supported GGUF models locally and includes a permission-scoped workspace foundation.
 
+## V0.9.7 — llama.cpp API compatibility fix
+
+- Remove unsupported `use_mmap` and `use_mlock` assignments; rely on the pinned llama.cpp revision's model-parameter defaults
+
 ## V0.9.6 — Native model-load stability and crash-loop protection
 
 - Remove `@FastNative` from blocking JNI operations such as model loading, context preparation, inference and cleanup so ART can manage thread state and GC normally
-- Explicitly keep GGUF model weights memory-mapped and avoid locking them into physical RAM
+- Keep the pinned llama.cpp model-parameter defaults for GGUF weight mapping and page locking
 - Log native memory snapshots and elapsed time before/after model loading and context preparation
 - Persist an in-progress marker around native loading; if Android terminates the app during load, show a recovery message on next launch and stop automatic reload loops
 
