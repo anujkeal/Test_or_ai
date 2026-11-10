@@ -258,7 +258,7 @@ internal class InferenceEngineImpl private constructor(
                     if (resetResult == 0) _state.value = InferenceEngine.State.ModelReady
                     else throw IOException("Prompt failed ($result) and conversation reset failed ($resetResult).")
                     if (result == 3) {
-                        throw IOException("Your message was too large for the remaining model context. NEXUS kept the newest part of the message and reset the conversation; try a shorter request.")
+                        throw IOException("The model has no free context space left for this message. NEXUS safely reset the conversation; please try again with a shorter request.")
                     }
                     throw IOException("NEXUS could not fit this message into the model context. The conversation was reset safely; please try a shorter request.")
                 }
