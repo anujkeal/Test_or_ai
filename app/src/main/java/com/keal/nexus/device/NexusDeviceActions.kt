@@ -42,7 +42,7 @@ class NexusDeviceActions(private val context: Context) {
             else -> null
         }
         return appName in setOf("youtube", "youtube music", "chrome", "whatsapp", "instagram",
-            "spotify", "maps", "google maps", "camera", "gallery", "settings", "calculator")
+            "spotify", "maps", "google maps", "camera", "gallery", "settings", "calculator", "google", "google maps", "google map")
     }
 
     fun execute(spoken: String): String? {
@@ -182,7 +182,10 @@ class NexusDeviceActions(private val context: Context) {
                 "camera" to listOf("com.android.camera2", "com.oplus.camera"),
                 "gallery" to listOf("com.google.android.apps.photos", "com.oplus.gallery"),
                 "settings" to listOf("com.android.settings"),
-                "calculator" to listOf("com.google.android.calculator", "com.android.calculator2")
+                "calculator" to listOf("com.google.android.calculator", "com.android.calculator2"),
+                "google" to listOf("com.google.android.googlequicksearchbox"),
+                "google maps" to listOf("com.google.android.apps.maps"),
+                "google map" to listOf("com.google.android.apps.maps")
             )
             val packageNames = packages[appName]
             if (packageNames != null) {
