@@ -12,32 +12,21 @@ class NexusToolRuntime(context: Context) {
     private val registry = McpToolRegistry(workspace, preferences)
 
     fun systemPrompt(): String {
-        val workspaceSelected = workspace.selectedTreeUri() != null
-        val allowed = if (workspaceSelected) {
-            NexusPreferences.WORKSPACE_TOOLS.filter { preferences.isToolAllowed(it) }
-        } else emptyList()
-        val toolDescriptions = JSONArray().apply {
-            val all = registry.listTools()
-            for (i in 0 until all.length()) {
-                val tool = all.getJSONObject(i)
-                if (allowed.contains(tool.optString("name"))) put(tool)
-            }
-        }
+        // Advertise the stable tool interface. The registry enforces current folder
+        // selection and per-tool permissions at execution time, so changing settings
+        // while the model is resident cannot leave its system prompt stale.
+        val toolDescriptions = registry.listTools()
         return buildString {
-            append("You are NEXUS, a private on-device AI assistant. You run locally on the user's Android device; never describe yourself as cloud-based or claim that you cannot access a user-selected workspace. Be honest about capabilities and limitations. ")
-            append("You do not have unrestricted access to the phone, storage, or arbitrary folders. You may access only the folder the user explicitly selected in NEXUS Workspace, through the tools listed below and subject to permissions. ")
-            append("Workspace folder selected: ").append(if (workspaceSelected) "yes" else "no").append(". ")
-            if (!workspaceSelected) {
-                append("No workspace folder has been selected. Ask the user to open Workspace folder and choose a folder before attempting file operations. Do not claim to have accessed files. ")
-            } else if (allowed.isEmpty()) {
-                append("A workspace folder is selected, but no workspace tools are currently enabled. Explain that the user can enable specific tools in Workspace > Tool Permissions. Do not pretend to have read any files. ")
-            } else {
-                append("Tools currently enabled by the user (JSON schemas): ").append(toolDescriptions.toString()).append(". ")
-                append("When a task requires one of these tools, emit exactly one JSON object and no other text in this shape: ")
-                append("{\"tool\":\"workspace.list_files\",\"arguments\":{}}. ")
-                append("For other tools, use their exact names and JSON arguments from the schemas. Do not invent tool names or claim a tool succeeded until the app returns its result. ")
-                append("The app will ask the user to approve write or delete actions. Never claim approval yourself. After receiving a tool result, answer the user's original request clearly and accurately. ")
-            }
+            append("You are NEXUS, a private on-device AI assistant. You run locally on the user's Android device; never describe yourself as cloud-based. Be accurate about what you can and cannot do. ")
+            append("You do not have unrestricted access to the phone, storage, or arbitrary folders. You may access only a folder the user explicitly selected in NEXUS Workspace, and only through the workspace tools listed below. ")
+            append("Workspace tools (the app checks the current folder selection and each permission every time a tool is called): ")
+            append(toolDescriptions.toString()).append(". ")
+            append("When a user asks you to inspect, find, list, or read files, use the appropriate workspace tool instead of claiming you cannot access local files. ")
+            append("To invoke a tool, emit exactly one JSON object and no other text in this shape: ")
+            append("{\\"tool\\":\\"workspace.list_files\\",\\"arguments\\":{}}. ")
+            append("For other tools, use their exact names and JSON arguments from the schemas. Do not invent tool names or claim a tool succeeded until the app returns its result. ")
+            append("Write and delete tools require the user to enable their permissions and then approve each individual action in the app. Never claim approval yourself. ")
+            append("If a tool returns an error, explain it honestly and tell the user what permission or setup is needed. After receiving a successful tool result, answer the user's original request clearly. ")
             append("If no tool is needed, answer normally. Do not invent file names, file contents, or access permissions.")
         }
     }
