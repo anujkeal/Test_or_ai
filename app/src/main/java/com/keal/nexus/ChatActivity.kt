@@ -32,12 +32,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arm.aichat.AiChat
 import com.arm.aichat.InferenceEngine
+import com.keal.nexus.agent.NexusToolCall
+import com.keal.nexus.agent.NexusToolRuntime
 import com.keal.nexus.data.ChatHistoryStore
 import com.keal.nexus.data.SavedChat
 import com.keal.nexus.data.SavedChatMessage
 import com.keal.nexus.data.ModelCatalog
 import com.keal.nexus.data.ModelManager
 import com.keal.nexus.data.ModelSpec
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
@@ -49,7 +52,10 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
-private const val NEXUS_SYSTEM_PROMPT = "You are NEXUS, a helpful, clear and thoughtful on-device AI assistant. Answer accurately and naturally."
+private data class PendingToolApproval(
+    val call: NexusToolCall,
+    val decision: CompletableDeferred<Boolean>
+)
 
 private data class ChatMessage(val user: Boolean, val text: String)
 
@@ -85,6 +91,7 @@ private fun NexusChatApp(initialPath: String?) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("nexus_preferences", Context.MODE_PRIVATE) }
     val scope = rememberCoroutineScope()
+    val toolRuntime = remember { NexusToolRuntime(context) }
 
     var themeMode by remember {
         mutableStateOf(runCatching {
@@ -110,6 +117,7 @@ private fun NexusChatApp(initialPath: String?) {
     var pendingRestoreChat by remember { mutableStateOf<SavedChat?>(null) }
     var restoringHistory by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
+    var pendingToolApproval by remember { mutableStateOf<PendingToolApproval?>(null) }
     var downloadId by remember { mutableStateOf(prefs.getLong("active_download_id", -1L).takeIf { it >= 0L }) }
     var downloadModel by remember { mutableStateOf(ModelCatalog.models.firstOrNull { it.id == prefs.getString("active_download_model_id", null) }) }
     var downloadProgress by remember { mutableFloatStateOf(0f) }
@@ -217,7 +225,7 @@ private fun NexusChatApp(initialPath: String?) {
                     loadStage = "Loading model weights"
                     local.loadModel(requestedPath)
                     loadStage = "Preparing chat"
-                    local.setSystemPrompt(NEXUS_SYSTEM_PROMPT)
+                    local.setSystemPrompt(toolRuntime.systemPrompt())
                 } else {
                     loadStage = "Reusing loaded model"
                 }
@@ -244,7 +252,7 @@ private fun NexusChatApp(initialPath: String?) {
                 generationJob?.cancelAndJoin()
                 generationJob = null
                 generating = false
-                engine?.resetConversation(NEXUS_SYSTEM_PROMPT) ?: error("Inference engine is unavailable.")
+                engine?.resetConversation(toolRuntime.systemPrompt()) ?: error("Inference engine is unavailable.")
                 ready = true
             } catch (t: Throwable) {
                 ready = false
@@ -308,7 +316,7 @@ private fun NexusChatApp(initialPath: String?) {
         loading = true
         loadError = null
         try {
-            activeEngine.resetConversation(NEXUS_SYSTEM_PROMPT)
+            activeEngine.resetConversation(toolRuntime.systemPrompt())
             chat.messages.filter { it.user }.takeLast(8).forEach { turn ->
                 activeEngine.sendUserPrompt(turn.text, 512).collect { }
             }
@@ -549,10 +557,48 @@ private fun NexusChatApp(initialPath: String?) {
                                 generating = true
                                 generationJob = scope.launch {
                                     try {
-                                        val answer = StringBuilder()
-                                        engine?.sendUserPrompt(prompt, 512)?.collect { token ->
-                                            answer.append(token)
-                                            if (messages.isNotEmpty()) messages[messages.lastIndex] = ChatMessage(false, answer.toString())
+                                        val activeEngine = engine ?: error("The local inference engine is unavailable.")
+                                        var nextPrompt = prompt
+                                        var toolCallCount = 0
+                                        while (true) {
+                                            val answer = StringBuilder()
+                                            activeEngine.sendUserPrompt(nextPrompt, 512).collect { token ->
+                                                answer.append(token)
+                                            }
+                                            val toolCall = toolRuntime.parseToolCall(answer.toString())
+                                            if (toolCall == null) {
+                                                if (messages.isNotEmpty()) {
+                                                    messages[messages.lastIndex] = ChatMessage(false, answer.toString().ifBlank { "I couldn't produce a response. Please try again." })
+                                                }
+                                                break
+                                            }
+                                            if (toolCallCount >= 3) {
+                                                if (messages.isNotEmpty()) messages[messages.lastIndex] =
+                                                    ChatMessage(false, "I reached the workspace tool-call limit for this request. Please narrow the task and try again.")
+                                                break
+                                            }
+                                            toolCallCount++
+                                            val destructive = toolCall.name == "workspace.write_file" || toolCall.name == "workspace.delete_file"
+                                            val toolResult = if (destructive) {
+                                                val decision = CompletableDeferred<Boolean>()
+                                                pendingToolApproval = PendingToolApproval(toolCall, decision)
+                                                if (messages.isNotEmpty()) messages[messages.lastIndex] =
+                                                    ChatMessage(false, "Waiting for your approval to " + toolCall.name.substringAfter('.').replace('_', ' ') + "…")
+                                                val approved = decision.await()
+                                                pendingToolApproval = null
+                                                if (approved) withContext(Dispatchers.IO) {
+                                                    toolRuntime.execute(toolCall, userApproved = true)
+                                                } else {
+                                                    "Tool not executed: you declined the requested action."
+                                                }
+                                            } else {
+                                                if (messages.isNotEmpty()) messages[messages.lastIndex] =
+                                                    ChatMessage(false, "Using " + toolCall.name + "…")
+                                                withContext(Dispatchers.IO) { toolRuntime.execute(toolCall) }
+                                            }
+                                            nextPrompt = "Workspace tool execution has completed.\\n" +
+                                                toolResult +
+                                                "\\nNow answer the user's original request using this result. Be explicit if the tool failed or permission was denied. Do not output another tool request unless another permitted operation is essential."
                                         }
                                     } catch (cancelled: kotlinx.coroutines.CancellationException) {
                                         throw cancelled
@@ -725,6 +771,44 @@ private fun NexusChatApp(initialPath: String?) {
                     }
                 }
             }
+        }
+
+        pendingToolApproval?.let { pending ->
+            val toolName = pending.call.name
+            val fileName = pending.call.arguments.optString("name", "the selected file")
+            val isDelete = toolName == "workspace.delete_file"
+            val isWrite = toolName == "workspace.write_file"
+            val preview = pending.call.arguments.optString("content").take(420)
+            AlertDialog(
+                onDismissRequest = { pending.decision.complete(false) },
+                containerColor = surface,
+                title = { Text(if (isDelete) "Confirm file deletion" else "Approve workspace write", color = primaryText) },
+                text = {
+                    Column {
+                        Text(
+                            if (isDelete) "NEXUS wants to delete \"${fileName}\" from your selected workspace."
+                            else "NEXUS wants to create or replace \"${fileName}\" in your selected workspace.",
+                            color = primaryText
+                        )
+                        if (isWrite && preview.isNotBlank()) {
+                            Spacer(Modifier.height(10.dp))
+                            Text(preview, color = mutedText, fontSize = 12.sp, maxLines = 8)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text("This action runs only after you approve it. Tool permissions must also be enabled in Workspace settings.", color = mutedText, fontSize = 12.sp)
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { pending.decision.complete(true) }) {
+                        Text(if (isDelete) "Delete file" else "Approve", color = if (isDelete) Color(0xFFE36B79) else NexusMint)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pending.decision.complete(false) }) {
+                        Text("Cancel", color = mutedText)
+                    }
+                }
+            )
         }
 
         if (showHistory) {
