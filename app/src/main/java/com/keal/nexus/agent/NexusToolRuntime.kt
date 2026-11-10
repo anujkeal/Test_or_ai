@@ -10,6 +10,7 @@ data class WorkspaceIntent(val action: Action, val fileName: String? = null) {
 }
 
 class NexusToolRuntime(context: Context) {
+    private val appContext = context.applicationContext
     private val workspace = WorkspaceStore(context.applicationContext)
     private val preferences = NexusPreferences(context.applicationContext)
     private val registry = McpToolRegistry(workspace, preferences)
@@ -219,7 +220,7 @@ class NexusToolRuntime(context: Context) {
             }
             "android.youtube_search" -> {
                 val query = args.optString("query").trim()
-                if (query.isBlank() || query.length > 120 || query.any { it.isISOControl() }) {
+                if (query.isBlank() || query.length > 120 || query.any { it.code < 0x20 || it.code == 0x7f }) {
                     return "Blocked by NEXUS security policy: invalid YouTube search query."
                 }
                 "open youtube and play $query"
