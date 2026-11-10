@@ -304,16 +304,19 @@ class NexusToolRuntime(context: Context) {
             "android_version" -> listOf("/system/bin/getprop", "ro.build.version.release")
             else -> return "Command blocked: '$command' is not in the read-only command allowlist."
         }
+        val outputFile = java.io.File.createTempFile("nexus-command-", ".log", appContext.cacheDir)
         return try {
             val process = ProcessBuilder(invocation)
                 .directory(workingDirectory)
                 .redirectErrorStream(true)
+                .redirectOutput(outputFile)
                 .start()
             if (!process.waitFor(4, java.util.concurrent.TimeUnit.SECONDS)) {
                 process.destroyForcibly()
+                process.waitFor(500, java.util.concurrent.TimeUnit.MILLISECONDS)
                 "Command timed out after 4 seconds."
             } else {
-                val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
+                val output = outputFile.readText().trim()
                 val status = process.exitValue()
                 val result = output.take(3_000).ifBlank { "(no output)" }
                 preferences.logAndroidAction("android.run_command:$command", "exit=$status; $result")
@@ -321,6 +324,8 @@ class NexusToolRuntime(context: Context) {
             }
         } catch (error: Exception) {
             "Command failed: ${error.message ?: "Android denied execution"}."
+        } finally {
+            outputFile.delete()
         }
     }
 
