@@ -649,7 +649,9 @@ private fun NexusChatApp(initialPath: String?) {
                                         val activeEngine = engine ?: error("The local inference engine is unavailable.")
                                         // Explicit device requests are handled by Android, not by model-generated claims.
                                         val callMatch = Regex("^(?:please\\s+)?(?:call|dial|phone)\\s+(?:my\\s+)?(.+)$", RegexOption.IGNORE_CASE).matchEntire(prompt)
-                                        val deviceResult = when {
+                                        val deviceResult = if (!prefs.getBoolean("android_control_enabled", false)) {
+                                            null
+                                        } else when {
                                             callMatch != null -> {
                                                 val name = callMatch.groupValues[1].trim()
                                                 selectedCallName = name
