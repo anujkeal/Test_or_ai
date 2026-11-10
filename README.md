@@ -1,3 +1,10 @@
+## V0.11.2 — Bounded file generation
+
+- File-content generation is limited to 256 tokens and a 2-minute collection timeout, with an explicit timeout error instead of an indefinite thinking indicator
+- The send control becomes a stop control while generation is active
+- Stopping generation resets the partial native conversation before the next prompt
+- Workspace file writes still require a selected folder, enabled write permission, and per-action approval
+
 ## V0.11.1 — Workspace file generation and YouTube playback
 
 - Detect common language requests such as "create a Python file" and infer practical filenames
