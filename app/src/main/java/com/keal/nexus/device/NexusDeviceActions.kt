@@ -32,9 +32,11 @@ class NexusDeviceActions(private val context: Context) {
             if (title.isBlank()) return "Tell me which song or video to search for."
             val url = "https://www.youtube.com/results?search_query=" + URLEncoder.encode(title, "UTF-8")
             return try {
+                val autoplayArmed = NexusAccessibilityService.armYouTubeAutoplay()
                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                "Opened YouTube search results for $title. Choose a result to play."
+                if (autoplayArmed) "Opened YouTube and asked Android Accessibility to start the first video result for $title. If it does not start automatically, tap the matching result."
+                else "Opened YouTube search results for $title. To auto-select the first result, enable NEXUS app interaction in Accessibility settings; otherwise tap the matching result."
             } catch (e: Exception) {
                 "I couldn't open YouTube: ${e.message ?: "no compatible app available"}."
             }
@@ -125,8 +127,10 @@ class NexusDeviceActions(private val context: Context) {
             if (query.isBlank()) return "Tell me the song or video name."
             val url = "https://www.youtube.com/results?search_query=" + URLEncoder.encode(query, "UTF-8")
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val autoplayArmed = NexusAccessibilityService.armYouTubeAutoplay()
             context.startActivity(intent)
-            return "I searched YouTube for $query. Choose a result to play."
+            return if (autoplayArmed) "I searched YouTube for $query and asked Android Accessibility to start the first video result. If it does not start automatically, tap the matching result."
+            else "I searched YouTube for $query. Enable NEXUS app interaction in Accessibility settings for automatic first-result selection, or tap the result yourself."
         }
 
         val appName = when {
