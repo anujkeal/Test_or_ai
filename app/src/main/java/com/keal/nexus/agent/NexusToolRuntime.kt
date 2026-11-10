@@ -167,16 +167,25 @@ class NexusToolRuntime(context: Context) {
         return runCatching {
             val root = JSONObject(json)
             val nested = root.optJSONObject("tool_call")
-            val name = nested?.optString("name").orEmpty()
-                .ifBlank { root.optString("tool").ifBlank { root.optString("name") } }
+            val firstCall = root.optJSONArray("tool_calls")?.optJSONObject(0)
             val function = root.optJSONObject("function")
-            val args = nested?.optJSONObject("arguments")
-                ?: nested?.optJSONObject("parameters")
-                ?: root.optJSONObject("arguments")
-                ?: root.optJSONObject("parameters")
-                ?: function?.optJSONObject("arguments")
-                ?: function?.optJSONObject("parameters")
-                ?: JSONObject()
+                ?: nested?.optJSONObject("function")
+                ?: firstCall?.optJSONObject("function")
+            val name = nested?.optString("name").orEmpty()
+                .ifBlank { function?.optString("name").orEmpty() }
+                .ifBlank { root.optString("tool").ifBlank { root.optString("name") } }
+            val rawArgs: Any? = nested?.opt("arguments")
+                ?: nested?.opt("parameters")
+                ?: firstCall?.opt("arguments")
+                ?: function?.opt("arguments")
+                ?: function?.opt("parameters")
+                ?: root.opt("arguments")
+                ?: root.opt("parameters")
+            val args = when (rawArgs) {
+                is JSONObject -> rawArgs
+                is String -> runCatching { JSONObject(rawArgs) }.getOrNull() ?: JSONObject()
+                else -> JSONObject()
+            }
             if (name !in NexusPreferences.WORKSPACE_TOOLS && name !in ANDROID_TOOLS) null else NexusToolCall(name, args)
         }.getOrNull()
     }
