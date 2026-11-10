@@ -22,12 +22,12 @@ class NexusDeviceActions(private val context: Context) {
         // Parse combined YouTube requests before the generic "open <app>" shortcut.
         // A YouTube search is not the same as guaranteed automatic playback.
         val youtubePlay = Regex(
-            "^(?:(?:please\\\\s+)?(?:open|launch|start)\\\\s+youtube\\\\s+(?:and\\\\s+)?(?:play|search(?:\\\\s+for)?)\\\\s+|(?:play|search\\\\s+for)\\\\s+)(.+?)(?:\\\\s+(?:song|video)\\\\s+on\\\\s+youtube)?$",
+            """^(?:(?:please\s+)?(?:open|launch|start)\s+youtube\s+(?:and\s+)?(?:play|search(?:\s+for)?)\s+|(?:play|search\s+for)\s+)(.+?)(?:\s+(?:song|video)\s+on\s+youtube)?$""",
             RegexOption.IGNORE_CASE
         ).matchEntire(command)
         if (youtubePlay != null) {
             val title = youtubePlay.groupValues[1].trim()
-                .replace(Regex("\\\\s+on\\\\s+youtube$", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("""\s+on\s+youtube$""", RegexOption.IGNORE_CASE), "")
                 .trim()
             if (title.isBlank()) return "Tell me which song or video to search for."
             val url = "https://www.youtube.com/results?search_query=" + URLEncoder.encode(title, "UTF-8")
