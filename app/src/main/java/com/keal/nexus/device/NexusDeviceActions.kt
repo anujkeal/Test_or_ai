@@ -16,7 +16,7 @@ import java.net.URLEncoder
 class NexusDeviceActions(private val context: Context) {
     fun isUnrestrictedShellRequest(spoken: String): Boolean {
         val lower = spoken.trim().lowercase()
-        return Regex("""\\b(cmd|command prompt|powershell|adb shell|run shell|execute shell|terminal command|run command|execute command)\\b""")
+        return Regex("""\b(cmd|command prompt|powershell|adb shell|run shell|execute shell|terminal command|run command|execute command)\b""")
             .containsMatchIn(lower)
     }
 
@@ -32,8 +32,8 @@ class NexusDeviceActions(private val context: Context) {
                 "play local music", "open local music", "play music from my phone", "choose local song")) return true
         if (lower.startsWith("type ") || lower.startsWith("confirm tap ") ||
             lower.startsWith("set a timer for ") || lower.startsWith("start a timer for ")) return true
-        if (Regex("""^(?:set|create) (?:an? )?alarm for \\d{1,2}(?::\\d{2})?\\s*(?:am|pm)?$""").matches(lower)) return true
-        if (Regex("""^(?:(?:please\\s+)?(?:open|launch|start)\\s+youtube\\s+(?:and\\s+)?(?:play|search(?:\\s+for)?)\\s+|(?:play|search\\s+for\\s+).+?)(?:\\s+(?:song|video)\\s+on\\s+youtube)?$""").matches(lower)) return true
+        if (Regex("""^(?:set|create) (?:an? )?alarm for \d{1,2}(?::\d{2})?\s*(?:am|pm)?$""").matches(lower)) return true
+        if (Regex("""^(?:(?:please\s+)?(?:open|launch|start)\s+youtube\s+(?:and\s+)?(?:play|search(?:\s+for)?)\s+|(?:play|search\s+for\s+).+?)(?:\s+(?:song|video)\s+on\s+youtube)?$""").matches(lower)) return true
         if (lower.startsWith("search youtube for ") || lower.startsWith("find on youtube ") ||
             (lower.startsWith("play ") && lower !in setOf("play music", "play local music"))) return true
         val appName = when {
