@@ -129,13 +129,13 @@ class NexusDeviceActions(private val context: Context) {
         }
 
         if (lower in listOf("play local music", "open local music", "play music from my phone", "choose local song")) {
-            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                type = "audio/*"
-                addCategory(Intent.CATEGORY_OPENABLE)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_MUSIC)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (intent.resolveActivity(context.packageManager) == null) {
+                return "No music player is registered on this phone. Install or choose a music player, then try again."
             }
             context.startActivity(intent)
-            return "Choose an audio file. Android will open it with an installed music player."
+            return "Opening your music player. Choose a downloaded song there."
         }
         if (lower in listOf("pause music", "resume music", "next song", "previous song", "play music")) {
             return "I heard the media command. Direct control of another app's playback depends on whether that music app exposes an active media session. Open the player and use its playback controls for now."
