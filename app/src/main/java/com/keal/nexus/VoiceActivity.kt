@@ -177,7 +177,7 @@ private fun VoiceVisualizerScreen(onClose: () -> Unit) {
                         val perspective = 1f + z2 * .22f
                         var x = cx + x1 * motion * baseRadius * perspective + offsetX[index]
                         var y = cy + y2 * motion * baseRadius * perspective + offsetY[index]
-                        if (pointer.isSpecified) {
+                        if (pointer != Offset.Unspecified) {
                             val dx = x - pointer.x
                             val dy = y - pointer.y
                             val distanceSquared = dx * dx + dy * dy
