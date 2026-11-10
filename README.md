@@ -1,3 +1,12 @@
+## V0.11.0 — Voice device actions and optional Accessibility
+
+- Add a deterministic allow-listed Android action router before local model inference in Voice mode
+- Open supported installed apps, search YouTube for spoken song/video requests, launch the phone's music player, set alarms and timers, and control the flashlight with runtime camera permission
+- Add an optional Accessibility Service for explicit Back/Home/notifications/quick-settings, scroll, focused-field typing, and confirmed visible-text taps
+- Provide a Voice screen shortcut to Android Accessibility settings; users must enable the service themselves
+- Restrict app shortcuts to declared package visibility and avoid arbitrary model-generated intents
+- Actions not exposed by Android or the target app report their limitations instead of claiming success
+
 # NEXUS AI
 
 **Your AI. Your device. Your data.**
