@@ -38,8 +38,65 @@ class NexusToolRuntime(context: Context) {
         val text = prompt.trim()
         if (text.isEmpty()) return null
         val lower = text.lowercase()
-        val fileName = Regex("""([A-Za-z0-9_.-]+\.(?:html?|css|js|json|txt|md|py|kt))""", RegexOption.IGNORE_CASE)
-            .find(text)?.groupValues?.get(1) ?: if ("html" in lower && listOf("create", "make", "generate", "write", "save", "build").any { it in lower }) "index.html" else null
+        val createVerbs = listOf("create", "make", "generate", "write", "save", "build")
+        val wantsCreate = createVerbs.any { Regex("""\b\${it}\b""").containsMatchIn(lower) }
+        val explicitFileName = Regex("""([A-Za-z0-9_-]+\.[A-Za-z0-9]{1,12})""", RegexOption.IGNORE_CASE)
+            .find(text)?.groupValues?.get(1)
+        val inferredExtension = when {
+            Regex("""\bpython\b""").containsMatchIn(lower) -> "py"
+            Regex("""\bjavascript\b""").containsMatchIn(lower) -> "js"
+            Regex("""\btypescript\b""").containsMatchIn(lower) -> "ts"
+            Regex("""\bkotlin\b""").containsMatchIn(lower) -> "kt"
+            Regex("""\bjava\b""").containsMatchIn(lower) -> "java"
+            Regex("""\bc\+\+\b""").containsMatchIn(lower) -> "cpp"
+            Regex("""\bc#\b""").containsMatchIn(lower) -> "cs"
+            Regex("""\bhtml\b""").containsMatchIn(lower) -> "html"
+            Regex("""\bcss\b""").containsMatchIn(lower) -> "css"
+            Regex("""\bjson\b""").containsMatchIn(lower) -> "json"
+            Regex("""\bxml\b""").containsMatchIn(lower) -> "xml"
+            Regex("""\byaml\b""").containsMatchIn(lower) -> "yml"
+            Regex("""\bsql\b""").containsMatchIn(lower) -> "sql"
+            Regex("""\b(csv|spreadsheet)\b""").containsMatchIn(lower) -> "csv"
+            Regex("""\b(markdown|readme)\b""").containsMatchIn(lower) -> "md"
+            Regex("""\b(shell|bash)\b""").containsMatchIn(lower) -> "sh"
+            Regex("""\brust\b""").containsMatchIn(lower) -> "rs"
+            Regex("""\bgolang\b""").containsMatchIn(lower) -> "go"
+            Regex("""\bruby\b""").containsMatchIn(lower) -> "rb"
+            Regex("""\bphp\b""").containsMatchIn(lower) -> "php"
+            Regex("""\bswift\b""").containsMatchIn(lower) -> "swift"
+            Regex("""\bdart\b""").containsMatchIn(lower) -> "dart"
+            Regex("""\btext\b""").containsMatchIn(lower) -> "txt"
+            else -> null
+        }
+        val fileName = explicitFileName ?: if (wantsCreate) {
+            when (inferredExtension) {
+                "html" -> "index.html"
+                "java" -> "Main.java"
+                "cpp" -> "main.cpp"
+                "py" -> "main.py"
+                "js" -> "main.js"
+                "kt" -> "Main.kt"
+                "ts" -> "main.ts"
+                "cs" -> "Program.cs"
+                "rs" -> "main.rs"
+                "go" -> "main.go"
+                "rb" -> "main.rb"
+                "php" -> "index.php"
+                "swift" -> "main.swift"
+                "dart" -> "main.dart"
+                "sh" -> "script.sh"
+                "sql" -> "query.sql"
+                "json" -> "data.json"
+                "xml" -> "data.xml"
+                "yml" -> "config.yml"
+                "csv" -> "data.csv"
+                "md" -> "README.md"
+                "css" -> "style.css"
+                "txt" -> "notes.txt"
+                else -> Regex("""\b(?:extension|file type|format)\s*[:.]?\s*([a-z0-9]{1,12})\b""", RegexOption.IGNORE_CASE)
+                    .find(text)?.groupValues?.get(1)?.let { "new_file.$it" }
+            }
+        } else null
         val mentionsFiles = listOf("file", "files", "folder", "workspace", "document").any { it in lower }
         if ((( "path" in lower || "where is" in lower || "what is" in lower || "location of" in lower) && fileName != null)) {
             return WorkspaceIntent(WorkspaceIntent.Action.PATH, fileName)
@@ -66,6 +123,7 @@ class NexusToolRuntime(context: Context) {
         "Create the complete contents for the file $fileName requested by the user. " +
             "Return ONLY the file contents, with no explanation, no markdown code fences, no JSON tool call, " +
             "and no claim that the file has been saved. Preserve the user's requested purpose. " +
+            "Generate content appropriate for the requested file extension and language. For source-code files, produce complete runnable or compilable source where practical, include necessary imports and a concise main entry point, and avoid placeholder-only code. For JSON, XML, YAML, CSV, SQL, and configuration files, produce syntactically valid content in that format. " +
             "If it is an HTML file, return a complete valid HTML document with doctype, html, head, title, body, and responsive viewport. " +
             "Original request: $originalRequest"
 
