@@ -220,7 +220,7 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
                     response += token
                 }
                 if (response.isBlank()) response = "I couldn't generate a response. Please try again."
-                val leakedToolPayload = Regex("""(?s)^\\s*\\{.*(?:\"tool\"|\"tool_call\"|\"tool_calls\").*\\}\\s*$""").matches(response.trim())
+                val leakedToolPayload = Regex("""(?s)^\s*\{.*("tool"|"tool_call"|"tool_calls").*\}\s*$""").matches(response.trim())
                 if (leakedToolPayload) response = "I recognised a possible phone action, but the model returned an internal command instead of a safe action. Try a direct command such as: open Google Maps or open YouTube."
                 visualState = VoiceVisualState.SPEAKING
                 status = "NEXUS"
