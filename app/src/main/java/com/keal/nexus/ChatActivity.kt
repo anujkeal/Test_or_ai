@@ -107,6 +107,7 @@ private fun NexusChatApp(initialPath: String?) {
         }.getOrDefault(NexusThemeMode.SYSTEM))
     }
     var wifiOnly by remember { mutableStateOf(prefs.getBoolean("wifi_only", false)) }
+    var androidControlEnabled by remember { mutableStateOf(prefs.getBoolean("android_control_enabled", false)) }
     var modelPath by remember { mutableStateOf(initialPath) }
     var engine by remember { mutableStateOf<InferenceEngine?>(null) }
     var ready by remember { mutableStateOf(false) }
@@ -757,7 +758,7 @@ private fun NexusChatApp(initialPath: String?) {
                                             }
                                             if (toolCallCount >= 3) {
                                                 if (messages.isNotEmpty()) messages[messages.lastIndex] =
-                                                    ChatMessage(false, "I reached the workspace tool-call limit for this request. Please narrow the task and try again.")
+                                                    ChatMessage(false, "I reached the safe action limit for this request. Please narrow the task and try again.")
                                                 break
                                             }
                                             toolCallCount++
@@ -1071,6 +1072,18 @@ private fun NexusChatApp(initialPath: String?) {
                             prefs.edit().putBoolean("wifi_only", it).apply()
                         })
                     }
+                    HorizontalDivider(color = border)
+                    Row(Modifier.fillMaxWidth().padding(vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Android command control", color = primaryText, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Let NEXUS open approved apps, search YouTube, navigate, scroll and control the flashlight. No shell or root access.", color = mutedText, fontSize = 13.sp, lineHeight = 18.sp)
+                        }
+                        Switch(checked = androidControlEnabled, onCheckedChange = {
+                            androidControlEnabled = it
+                            prefs.edit().putBoolean("android_control_enabled", it).apply()
+                        })
+                    }
+                    Text("Accessibility actions additionally require you to enable NEXUS app interaction in Android Settings. Every AI action is checked against a fixed allowlist.", color = mutedText, fontSize = 12.sp, lineHeight = 17.sp)
                     HorizontalDivider(color = border)
                     Row(Modifier.fillMaxWidth().padding(vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("Theme", color = primaryText, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
