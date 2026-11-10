@@ -750,8 +750,21 @@ private fun NexusChatApp(initialPath: String?) {
                                                     if (finalResult == null) {
                                                         step++
                                                         messages[messages.lastIndex] = ChatMessage(false, "Phone control · step ${step}/8\n${actionHistory.lastOrNull().orEmpty()}")
-                                                        delay(900)
-                                                        screen = NexusAccessibilityService.screenSnapshot()
+                                                        if (action.action == "open_app") {
+                                                            var refreshed: String? = null
+                                                            repeat(7) {
+                                                                delay(700)
+                                                                val candidate = NexusAccessibilityService.screenSnapshot()
+                                                                if (!candidate.isNullOrBlank() && !candidate.startsWith("App: com.keal.nexus")) {
+                                                                    refreshed = candidate
+                                                                    return@repeat
+                                                                }
+                                                            }
+                                                            screen = refreshed ?: NexusAccessibilityService.screenSnapshot()
+                                                        } else {
+                                                            delay(900)
+                                                            screen = NexusAccessibilityService.screenSnapshot()
+                                                        }
                                                     }
                                                 }
                                                 finalResult ?: "I stopped after 8 actions to keep phone control bounded. Tell me to continue if the task is not finished."
