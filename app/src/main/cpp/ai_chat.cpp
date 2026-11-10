@@ -4,6 +4,8 @@
 #include <cmath>
 #include <string>
 #include <unistd.h>
+#include <sys/sysinfo.h>
+#include <chrono>
 #include <mutex>
 #include <sampling.h>
 
@@ -42,6 +44,22 @@ static common_sampler                   * g_sampler;
 static std::mutex g_error_mutex;
 static std::string g_last_model_error;
 
+static void log_memory_snapshot(const char *stage) {
+    struct sysinfo info {};
+    if (sysinfo(&info) == 0) {
+        const unsigned long long free_bytes =
+            static_cast<unsigned long long>(info.freeram) * info.mem_unit;
+        const unsigned long long total_bytes =
+            static_cast<unsigned long long>(info.totalram) * info.mem_unit;
+        LOGi("NEXUS memory [%s]: system free %.2f GiB / total %.2f GiB",
+             stage,
+             static_cast<double>(free_bytes) / (1024.0 * 1024.0 * 1024.0),
+             static_cast<double>(total_bytes) / (1024.0 * 1024.0 * 1024.0));
+    } else {
+        LOGw("NEXUS memory [%s]: sysinfo unavailable", stage);
+    }
+}
+
 static void nexus_log_callback(enum ggml_log_level level, const char * text, void * user_data) {
     aichat_android_log_callback(level, text, user_data);
     if (level == GGML_LOG_LEVEL_ERROR || level == GGML_LOG_LEVEL_WARN) {
@@ -72,16 +90,27 @@ extern "C"
 JNIEXPORT jint JNICALL
 Java_com_arm_aichat_internal_InferenceEngineImpl_load(JNIEnv *env, jobject, jstring jmodel_path) {
     llama_model_params model_params = llama_model_default_params();
+    // Keep weights file-backed: do not lock all model pages into physical RAM.
+    model_params.use_mmap = true;
+    model_params.use_mlock = false;
     {
         std::lock_guard<std::mutex> lock(g_error_mutex);
         g_last_model_error.clear();
     }
 
     const auto *model_path = env->GetStringUTFChars(jmodel_path, 0);
-    LOGd("%s: Loading model from: \n%s\n", __func__, model_path);
-
+    if (model_path == nullptr) return 2;
+    LOGi("NEXUS native load started (mmap=true, mlock=false)");
+    log_memory_snapshot("before model load");
+    const auto load_started = std::chrono::steady_clock::now();
     auto *model = llama_model_load_from_file(model_path, model_params);
+    const auto load_finished = std::chrono::steady_clock::now();
     env->ReleaseStringUTFChars(jmodel_path, model_path);
+    const auto load_seconds =
+        std::chrono::duration_cast<std::chrono::seconds>(load_finished - load_started).count();
+    LOGi("NEXUS native model load returned after %lld seconds",
+         static_cast<long long>(load_seconds));
+    log_memory_snapshot("after model load");
     if (!model) {
         std::lock_guard<std::mutex> lock(g_error_mutex);
         if (g_last_model_error.empty()) g_last_model_error = "llama.cpp returned null while opening the GGUF file. Check file integrity and GGUF compatibility.";
@@ -138,12 +167,20 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_nativeLastError(JNIEnv *env, jo
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_arm_aichat_internal_InferenceEngineImpl_prepare(JNIEnv * /*env*/, jobject /*unused*/) {
+    LOGi("NEXUS context preparation started");
+    log_memory_snapshot("before context preparation");
+    const auto prepare_started = std::chrono::steady_clock::now();
     auto *context = init_context(g_model);
     if (!context) { return 1; }
     g_context = context;
     g_batch = common_batch(context);
     g_chat_templates = common_chat_templates_init(g_model, "");
     g_sampler = new_sampler(DEFAULT_SAMPLER_TEMP);
+    const auto prepare_finished = std::chrono::steady_clock::now();
+    LOGi("NEXUS context preparation completed after %lld seconds",
+         static_cast<long long>(std::chrono::duration_cast<std::chrono::seconds>(
+             prepare_finished - prepare_started).count()));
+    log_memory_snapshot("after context preparation");
     return 0;
 }
 
