@@ -231,17 +231,28 @@ private fun NexusChatApp(initialPath: String?) {
                     (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager)
                         .getMemoryInfo(memoryInfo)
                     val modelBytes = requestedFile.length()
-                    val reserveBytes = 512L * 1024L * 1024L
-                    if (modelBytes >= 1_500L * 1024L * 1024L &&
-                        memoryInfo.availMem < modelBytes + reserveBytes
-                    ) {
+                    if (modelBytes <= 0L) {
+                        throw IOException("The selected GGUF file is empty or unavailable. Re-download or re-import the model.")
+                    }
+                    // llama.cpp needs memory beyond the GGUF file itself for tensors,
+                    // the KV cache, compute buffers and Android's own working set.
+                    // A file-size-plus-512MB check was too optimistic for 3B Q4 models
+                    // and allowed Android to kill the whole app during native loading.
+                    val gib = 1024L * 1024L * 1024L
+                    val requiredFreeBytes = if (modelBytes >= 1_500L * 1024L * 1024L) {
+                        modelBytes * 2L + gib
+                    } else {
+                        modelBytes * 3L / 2L + 512L * 1024L * 1024L
+                    }
+                    if (memoryInfo.lowMemory || memoryInfo.availMem < requiredFreeBytes) {
                         val availableGb = memoryInfo.availMem / (1024.0 * 1024.0 * 1024.0)
+                        val requiredGb = requiredFreeBytes / (1024.0 * 1024.0 * 1024.0)
                         val modelGb = modelBytes / (1024.0 * 1024.0 * 1024.0)
                         throw IOException(
-                            "Not enough free memory to safely load this model. " +
-                                "Model size: %.2f GB; currently available RAM: %.2f GB. " +
-                                "Close other apps or select Llama 3.2 1B / Qwen2.5 1.5B."
-                                    .format(modelGb, availableGb)
+                            "NEXUS stopped before loading to protect your phone from running out of memory. " +
+                                "Model size: %.2f GB; free RAM: %.2f GB; estimated safe minimum: %.2f GB. " +
+                                "Close other apps or choose Llama 3.2 1B / Qwen2.5 1.5B."
+                                    .format(modelGb, availableGb, requiredGb)
                         )
                     }
                     loadStage = "Loading model weights"
@@ -515,7 +526,10 @@ private fun NexusChatApp(initialPath: String?) {
                                         Spacer(Modifier.height(6.dp))
                                         Text(loadError!!, color = primaryText, fontSize = 12.sp)
                                         Spacer(Modifier.height(8.dp))
-                                        TextButton(onClick = { loadAttempt++ }) { Text("Try again") }
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            TextButton(onClick = { loadAttempt++ }) { Text("Try again") }
+                                            TextButton(onClick = { loadError = null; showModels = true }) { Text("Choose smaller model") }
+                                        }
                                     }
                                 }
                             }
