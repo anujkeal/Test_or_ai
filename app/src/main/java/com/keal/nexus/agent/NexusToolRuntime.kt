@@ -39,7 +39,7 @@ class NexusToolRuntime(context: Context) {
         if (text.isEmpty()) return null
         val lower = text.lowercase()
         val createVerbs = listOf("create", "make", "generate", "write", "save", "build")
-        val wantsCreate = createVerbs.any { Regex("""\b\${it}\b""").containsMatchIn(lower) }
+        val wantsCreate = createVerbs.any { Regex("\\b" + Regex.escape(it) + "\\b").containsMatchIn(lower) }
         val explicitFileName = Regex("""([A-Za-z0-9_-]+\.[A-Za-z0-9]{1,12})""", RegexOption.IGNORE_CASE)
             .find(text)?.groupValues?.get(1)
         val inferredExtension = when {
