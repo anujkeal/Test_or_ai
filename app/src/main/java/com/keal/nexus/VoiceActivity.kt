@@ -1,20 +1,31 @@
 package com.keal.nexus
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -23,16 +34,24 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import androidx.core.content.ContextCompat
+import com.arm.aichat.AiChat
+import com.arm.aichat.InferenceEngine
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.util.Locale
 import kotlin.math.*
 import kotlin.random.Random
 
 class VoiceActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { VoiceVisualizerScreen(onClose = { finish() }) }
+        val modelPath = intent.getStringExtra(EXTRA_MODEL_PATH)
+        setContent { VoiceAssistantScreen(modelPath = modelPath, onClose = { finish() }) }
+    }
+
+    companion object {
+        const val EXTRA_MODEL_PATH = "voice_model_path"
     }
 }
 
@@ -40,18 +59,29 @@ private enum class VoiceVisualState { IDLE, LISTENING, THINKING, SPEAKING }
 private data class SphereDot(val x: Float, val y: Float, val z: Float, val phase: Float, val seed: Float)
 
 @Composable
-private fun VoiceVisualizerScreen(onClose: () -> Unit) {
+private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    val engine = remember { runCatching { AiChat.getInferenceEngine(context.applicationContext) }.getOrNull() }
     val bg = Color(0xFF05070B)
     val ink = Color(0xFFF2F5FA)
     val muted = Color(0xFF8A94A6)
     val accent = Color(0xFF5EE0B0)
-    val scope = rememberCoroutineScope()
+
     var visualState by remember { mutableStateOf(VoiceVisualState.IDLE) }
-    var status by remember { mutableStateOf("Tap to talk") }
-    var caption by remember { mutableStateOf("Touch the dots, or tap the mic") }
-    var sequence by remember { mutableStateOf<Job?>(null) }
-    var pointer by remember { mutableStateOf(Offset.Unspecified) }
+    var status by remember { mutableStateOf("Tap the microphone to talk") }
+    var caption by remember { mutableStateOf("Speech recognition runs on-device when supported") }
+    var transcript by remember { mutableStateOf("") }
+    var response by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var speechRecognizer by remember { mutableStateOf<SpeechRecognizer?>(null) }
+    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
+    var ttsReady by remember { mutableStateOf(false) }
+    var onRecognized by remember { mutableStateOf<(String) -> Unit>({}) }
+    var startListeningRequested by remember { mutableStateOf(false) }
     var frame by remember { mutableLongStateOf(0L) }
+    var pointer by remember { mutableStateOf(Offset.Unspecified) }
+
     val dots = remember {
         val random = Random(23)
         List(1800) { index ->
@@ -66,35 +96,173 @@ private fun VoiceVisualizerScreen(onClose: () -> Unit) {
         while (true) withFrameNanos { frame = it }
     }
 
-    fun startAnimation() {
-        sequence?.cancel()
-        if (visualState != VoiceVisualState.IDLE) {
+    fun submitRecognizedSpeech(spokenText: String) {
+        val cleanText = spokenText.trim()
+        if (cleanText.isEmpty()) {
             visualState = VoiceVisualState.IDLE
-            status = "Tap to talk"
-            caption = "Touch the dots, or tap the mic"
+            status = "I didn't catch that"
             return
         }
-        visualState = VoiceVisualState.LISTENING
-        status = "Listening…"
-        caption = "Listening for your voice"
-        sequence = scope.launch {
-            delay(2800)
-            visualState = VoiceVisualState.THINKING
-            status = "Thinking…"
-            caption = "NEXUS is processing"
-            delay(1700)
-            visualState = VoiceVisualState.SPEAKING
-            status = "Speaking…"
-            caption = "Here is your response."
-            delay(3000)
-            visualState = VoiceVisualState.IDLE
-            status = "Tap to talk"
-            caption = "Touch the dots, or tap the mic"
+        transcript = cleanText
+        response = ""
+        error = null
+        visualState = VoiceVisualState.THINKING
+        status = "Thinking…"
+        caption = "Sending your words to NEXUS"
+        scope.launch {
+            try {
+                val activeEngine = engine ?: error("The inference engine is unavailable.")
+                if (activeEngine.state.value !is InferenceEngine.State.ModelReady) {
+                    error("The model is not ready. Return to chat and load a model first.")
+                }
+                if (modelPath.isNullOrBlank() || activeEngine.loadedModelPath != modelPath) {
+                    error("The selected model is not loaded. Return to chat and select it again.")
+                }
+                activeEngine.sendUserPrompt(cleanText, 512).collect { token ->
+                    response += token
+                }
+                if (response.isBlank()) response = "I couldn't generate a response. Please try again."
+                visualState = VoiceVisualState.SPEAKING
+                status = "NEXUS"
+                caption = response
+                if (ttsReady) {
+                    tts?.speak(response, TextToSpeech.QUEUE_FLUSH, null, "nexus-response")
+                } else {
+                    visualState = VoiceVisualState.IDLE
+                    status = "Response ready"
+                }
+            } catch (t: Throwable) {
+                visualState = VoiceVisualState.IDLE
+                status = "Something went wrong"
+                error = t.message ?: "NEXUS could not process your speech."
+                caption = error.orEmpty()
+            }
         }
     }
 
-    val seconds = frame / 1_000_000_000.0
-    val time = seconds.toFloat()
+    onRecognized = { spokenText -> submitRecognizedSpeech(spokenText) }
+
+    DisposableEffect(context) {
+        var recognizer: SpeechRecognizer? = null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+        ) {
+            recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+            recognizer.setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {
+                    visualState = VoiceVisualState.LISTENING
+                    status = "Listening…"
+                    caption = "Speak naturally. NEXUS is listening."
+                    error = null
+                }
+                override fun onBeginningOfSpeech() {}
+                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() {
+                    visualState = VoiceVisualState.THINKING
+                    status = "Recognising speech…"
+                    caption = "Converting your speech to text"
+                }
+                override fun onError(errorCode: Int) {
+                    visualState = VoiceVisualState.IDLE
+                    status = "Speech recognition stopped"
+                    error = when (errorCode) {
+                        SpeechRecognizer.ERROR_NO_MATCH -> "I couldn't understand that. Please try again."
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "I didn't hear anything. Tap the microphone and try again."
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission is required."
+                        else -> "Speech recognition error ($errorCode). Please try again."
+                    }
+                    caption = error.orEmpty()
+                }
+                override fun onResults(results: Bundle?) {
+                    val spoken = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                    if (spoken.isNullOrBlank()) {
+                        visualState = VoiceVisualState.IDLE
+                        status = "I didn't catch that"
+                    } else onRecognized(spoken)
+                }
+                override fun onPartialResults(partialResults: Bundle?) {
+                    val partial = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                    if (!partial.isNullOrBlank()) transcript = partial
+                }
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+            })
+        }
+        speechRecognizer = recognizer
+        onDispose {
+            recognizer?.destroy()
+            speechRecognizer = null
+        }
+    }
+
+    DisposableEffect(context) {
+        val speech = TextToSpeech(context) { result ->
+            ttsReady = result == TextToSpeech.SUCCESS
+            if (result == TextToSpeech.SUCCESS) {
+                tts?.language = Locale.getDefault()
+            }
+        }
+        tts = speech
+        speech.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {
+                visualState = VoiceVisualState.SPEAKING
+            }
+            override fun onDone(utteranceId: String?) {
+                visualState = VoiceVisualState.IDLE
+                status = "Tap the microphone to talk"
+                caption = "You can continue the conversation."
+            }
+            @Deprecated("Deprecated in Java")
+            override fun onError(utteranceId: String?) {
+                visualState = VoiceVisualState.IDLE
+                status = "Response ready"
+            }
+        })
+        onDispose {
+            speech.stop()
+            speech.shutdown()
+            tts = null
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) startListeningRequested = true
+        else {
+            error = "Microphone permission was denied. Allow it in Android app settings to use voice."
+            status = "Microphone permission needed"
+            caption = error.orEmpty()
+        }
+    }
+
+    LaunchedEffect(startListeningRequested) {
+        if (startListeningRequested) {
+            startListeningRequested = false
+            val recognizer = speechRecognizer
+            if (recognizer == null) {
+                error = "On-device speech recognition is not available on this phone. Install or enable an on-device speech recognition service to use private voice input."
+                status = "On-device recognition unavailable"
+                caption = error.orEmpty()
+            } else {
+                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
+                    putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                }
+                try {
+                    transcript = ""
+                    response = ""
+                    error = null
+                    recognizer.startListening(intent)
+                } catch (t: Throwable) {
+                    status = "Couldn't start listening"
+                    error = t.message ?: "Speech recognition could not start."
+                    caption = error.orEmpty()
+                }
+            }
+        }
+    }
+
     val targetSpeed = when (visualState) {
         VoiceVisualState.IDLE -> .004f
         VoiceVisualState.LISTENING -> .006f
@@ -107,30 +275,21 @@ private fun VoiceVisualizerScreen(onClose: () -> Unit) {
         VoiceVisualState.THINKING -> .50f
         VoiceVisualState.SPEAKING -> .64f
     }
-    val targetTwist = if (visualState == VoiceVisualState.THINKING) 2.4f else 0f
-    val targetRipple = if (visualState == VoiceVisualState.SPEAKING) .3f else 0f
-    val targetJitter = if (visualState == VoiceVisualState.LISTENING) .55f else 0f
-    val pulse = if (visualState == VoiceVisualState.IDLE || visualState == VoiceVisualState.THINKING) .03f else 0f
-    val level = max(0f, .5f + .5f * sin(time * 7.3f) * sin(time * 2.9f + 1f))
     val speed = animateFloatAsState(targetSpeed, tween(300), label = "sphereSpeed").value
     val radius = animateFloatAsState(targetRadius, tween(300), label = "sphereRadius").value
-    val twist = animateFloatAsState(targetTwist, tween(300), label = "sphereTwist").value
-    val ripple = animateFloatAsState(targetRipple, tween(300), label = "sphereRipple").value
-    val jitter = animateFloatAsState(targetJitter, tween(300), label = "sphereJitter").value
-    // The source HTML advances rotation once per animation frame (~60 fps).
+    val twist = animateFloatAsState(if (visualState == VoiceVisualState.THINKING) 2.4f else 0f, tween(300), label = "sphereTwist").value
+    val ripple = animateFloatAsState(if (visualState == VoiceVisualState.SPEAKING) .3f else 0f, tween(300), label = "sphereRipple").value
+    val jitter = animateFloatAsState(if (visualState == VoiceVisualState.LISTENING) .55f else 0f, tween(300), label = "sphereJitter").value
+    val time = (frame / 1_000_000_000.0).toFloat()
     val angle = time * speed * 60f
+    val level = max(0f, .5f + .5f * sin(time * 7.3f) * sin(time * 2.9f + 1f))
     val offsetX = remember { FloatArray(1800) }
     val offsetY = remember { FloatArray(1800) }
 
     Surface(color = bg, modifier = Modifier.fillMaxSize()) {
-        Column(
-            Modifier.fillMaxSize().padding(top = 12.dp, bottom = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        Column(Modifier.fillMaxSize().padding(top = 12.dp, bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.material3.TextButton(onClick = onClose) {
-                    Text("×", color = ink, fontSize = 30.sp, fontWeight = FontWeight.Light)
-                }
+                TextButton(onClick = onClose) { Text("×", color = ink, fontSize = 30.sp, fontWeight = FontWeight.Light) }
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Voice", color = ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -141,10 +300,7 @@ private fun VoiceVisualizerScreen(onClose: () -> Unit) {
                 }
                 Spacer(Modifier.width(48.dp))
             }
-            Box(
-                Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
                 Canvas(
                     Modifier.fillMaxWidth().aspectRatio(1f)
                         .pointerInput(Unit) {
@@ -153,9 +309,7 @@ private fun VoiceVisualizerScreen(onClose: () -> Unit) {
                                 onDragCancel = { pointer = Offset.Unspecified }
                             ) { change, _ -> pointer = change.position }
                         }
-                        .pointerInput(Unit) {
-                            detectTapGestures { pointer = it }
-                        }
+                        .pointerInput(Unit) { detectTapGestures { pointer = it } }
                 ) {
                     val size = min(this.size.width, this.size.height)
                     val cx = this.size.width / 2f
@@ -171,7 +325,7 @@ private fun VoiceVisualizerScreen(onClose: () -> Unit) {
                         val z1 = -dot.x * sa + dot.z * ca
                         val y2 = dot.y * tiltCos - z1 * tiltSin
                         val z2 = dot.y * tiltSin + z1 * tiltCos
-                        val motion = 1f + pulse * sin(time * 2f) +
+                        val motion = 1f + .03f * if (visualState == VoiceVisualState.IDLE || visualState == VoiceVisualState.THINKING) sin(time * 2f) else 0f +
                             ripple * level * sin(dot.y * 7f - time * 5f) +
                             jitter * level * dot.seed * .4f * sin(time * 8f + dot.phase)
                         val perspective = 1f + z2 * .22f
@@ -195,27 +349,50 @@ private fun VoiceVisualizerScreen(onClose: () -> Unit) {
                         val alpha = (.18f + .82f * (z2 * .5f + .5f)).coerceIn(.12f, 1f)
                         val dotSize = (.7f + dot.seed * .9f) * perspective
                         drawCircle(ink.copy(alpha = alpha), radius = dotSize.coerceAtLeast(.35f), center = Offset(x, y))
-
                     }
                 }
             }
             Text(status, color = ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(8.dp))
-            Text(caption, color = muted, fontSize = 14.sp)
-            Spacer(Modifier.height(22.dp))
+            Spacer(Modifier.height(6.dp))
+            Text(caption, color = muted, fontSize = 13.sp, maxLines = 2)
+            if (transcript.isNotBlank()) {
+                Spacer(Modifier.height(10.dp))
+                Text("YOU", color = accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text(transcript, color = ink, fontSize = 14.sp, maxLines = 3)
+            }
+            if (response.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text("NEXUS", color = accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text(response, color = ink, fontSize = 14.sp, maxLines = 4)
+            }
+            if (error != null) {
+                Spacer(Modifier.height(6.dp))
+                Text(error.orEmpty(), color = Color(0xFFE88991), fontSize = 12.sp, maxLines = 3)
+            }
+            Spacer(Modifier.height(18.dp))
             Surface(
-                onClick = { startAnimation() },
-                color = if (visualState == VoiceVisualState.IDLE) ink else accent,
+                onClick = {
+                    if (visualState == VoiceVisualState.LISTENING) {
+                        speechRecognizer?.cancel()
+                        visualState = VoiceVisualState.IDLE
+                        status = "Listening cancelled"
+                    } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                        startListeningRequested = true
+                    } else {
+                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                },
+                color = if (visualState == VoiceVisualState.LISTENING) accent else ink,
                 contentColor = bg,
                 shape = CircleShape,
-                modifier = Modifier.size(72.dp)
+                modifier = Modifier.size(76.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text(if (visualState == VoiceVisualState.IDLE) "●" else "■", fontSize = 24.sp)
+                    Text(if (visualState == VoiceVisualState.LISTENING) "■" else "●", fontSize = 24.sp)
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Text("Voice animation preview", color = muted, fontSize = 11.sp)
+            Text("Tap to speak · on-device recognition", color = muted, fontSize = 11.sp)
         }
     }
 }
