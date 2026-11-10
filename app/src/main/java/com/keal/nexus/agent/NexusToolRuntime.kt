@@ -128,7 +128,7 @@ class NexusToolRuntime(context: Context) {
 
     fun cleanGeneratedFileContent(output: String): String {
         val trimmed = output.trim()
-        val fenced = Regex("^\\x60{3}[^\\n]*\\n([\s\\S]*?)\\n\\x60{3}$").find(trimmed)
+        val fenced = Regex("""^```[^\n]*\n([\s\S]*?)\n```$""").find(trimmed)
         return (fenced?.groupValues?.get(1) ?: trimmed).trim()
     }
 
