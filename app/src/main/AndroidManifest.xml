@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
     <application
         android:allowBackup="false"
         android:label="NEXUS AI"
@@ -13,6 +15,18 @@
         <activity android:name=".agent.AgentActivity" android:exported="false" />
         <activity android:name=".VoiceActivity" android:exported="false" />
         <activity android:name=".ChatActivity" android:exported="false" />
+        <service
+            android:name=".device.NexusAccessibilityService"
+            android:label="NEXUS app interaction"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/nexus_accessibility_service" />
+        </service>
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
