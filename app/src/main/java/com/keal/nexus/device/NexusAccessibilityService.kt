@@ -13,6 +13,8 @@ class NexusAccessibilityService : AccessibilityService() {
         active = this
     }
 
+    override fun onInterrupt() = Unit
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event?.packageName?.toString() != "com.google.android.youtube") return
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
