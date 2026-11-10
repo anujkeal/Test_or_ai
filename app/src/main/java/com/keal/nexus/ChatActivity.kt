@@ -3,6 +3,10 @@ package com.keal.nexus
 import android.app.ActivityManager
 import android.app.DownloadManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.ContactsContract
+import com.keal.nexus.device.NexusDeviceActions
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -120,6 +124,30 @@ private fun NexusChatApp(initialPath: String?) {
     var restoringHistory by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var pendingToolApproval by remember { mutableStateOf<PendingToolApproval?>(null) }
+    var selectedCallName by remember { mutableStateOf<String?>(null) }
+    val contactPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val contactUri = result.data?.data
+        if (result.resultCode == android.app.Activity.RESULT_OK && contactUri != null) {
+            val phone = runCatching {
+                context.contentResolver.query(
+                    contactUri,
+                    arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
+                    null, null, null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0) else null
+                }
+            }.getOrNull()
+            if (!phone.isNullOrBlank()) {
+                val dialIntent = Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", phone, null))
+                runCatching { context.startActivity(dialIntent) }
+                    .onFailure { messages.add(ChatMessage(false, "I couldn't open the phone dialer: ${it.message ?: "no dialer available"}")) }
+            } else {
+                messages.add(ChatMessage(false, "I couldn't read the selected phone number. Please try another contact."))
+            }
+        }
+        selectedCallName = null
+    }
+
     var downloadId by remember { mutableStateOf(prefs.getLong("active_download_id", -1L).takeIf { it >= 0L }) }
     var downloadModel by remember { mutableStateOf(ModelCatalog.models.firstOrNull { it.id == prefs.getString("active_download_model_id", null) }) }
     var downloadProgress by remember { mutableFloatStateOf(0f) }
@@ -613,6 +641,22 @@ private fun NexusChatApp(initialPath: String?) {
                                 generationJob = scope.launch {
                                     try {
                                         val activeEngine = engine ?: error("The local inference engine is unavailable.")
+                                        // Explicit device requests are handled by Android, not by model-generated claims.
+                                        val callMatch = Regex("^(?:please\\s+)?(?:call|dial|phone)\\s+(?:my\\s+)?(.+)$", RegexOption.IGNORE_CASE).matchEntire(prompt)
+                                        val deviceResult = when {
+                                            callMatch != null -> {
+                                                val name = callMatch.groupValues[1].trim()
+                                                selectedCallName = name
+                                                contactPicker.launch(
+                                                    Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI)
+                                                )
+                                                "Choose $name from your contacts. I'll open the dialer with the selected number; confirm the call there."
+                                            }
+                                            else -> NexusDeviceActions(context.applicationContext).execute(prompt)
+                                        }
+                                        if (deviceResult != null) {
+                                            if (messages.isNotEmpty()) messages[messages.lastIndex] = ChatMessage(false, deviceResult)
+                                        } else {
                                         val workspaceIntent = toolRuntime.detectWorkspaceIntent(prompt)
                                         if (workspaceIntent != null) {
                                             val intentResult = when (workspaceIntent.action) {
@@ -726,6 +770,7 @@ private fun NexusChatApp(initialPath: String?) {
                                             nextPrompt = "Workspace tool execution has completed.\n" +
                                                 toolResult +
                                                 "\nNow answer the user's original request using this result. Be explicit if the tool failed or permission was denied. Do not output another tool request unless another permitted operation is essential."
+                                        }
                                         }
                                         }
                                     } catch (cancelled: kotlinx.coroutines.CancellationException) {
