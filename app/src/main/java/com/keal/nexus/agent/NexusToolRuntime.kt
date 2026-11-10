@@ -37,14 +37,14 @@ class NexusToolRuntime(context: Context) {
     fun detectWorkspaceIntent(prompt: String): WorkspaceIntent? {
         val text = prompt.trim()
         if (text.isEmpty()) return null
-        val fileName = Regex("""([A-Za-z0-9_.-]+\\.(?:html?|css|js|json|txt|md|py|kt))""", RegexOption.IGNORE_CASE)
-            .find(text)?.groupValues?.get(1)
         val lower = text.lowercase()
+        val fileName = Regex("""([A-Za-z0-9_.-]+\.(?:html?|css|js|json|txt|md|py|kt))""", RegexOption.IGNORE_CASE)
+            .find(text)?.groupValues?.get(1) ?: if ("html" in lower && listOf("create", "make", "generate", "write", "save", "build").any { it in lower }) "index.html" else null
         val mentionsFiles = listOf("file", "files", "folder", "workspace", "document").any { it in lower }
-        if ((("where is" in lower || "what is" in lower || "show me the path" in lower || "path of" in lower || "location of" in lower) && fileName != null)) {
+        if ((( "path" in lower || "where is" in lower || "what is" in lower || "location of" in lower) && fileName != null)) {
             return WorkspaceIntent(WorkspaceIntent.Action.PATH, fileName)
         }
-        if (fileName != null && listOf("read ", "open ", "contents of", "show contents").any { it in lower }) {
+        if (fileName != null && listOf("read ", "open ", "contents of", "show contents", "what is in ", "what's in ").any { it in lower }) {
             return WorkspaceIntent(WorkspaceIntent.Action.READ, fileName)
         }
         if ((listOf("list", "show", "what", "which").any { lower.startsWith(it) } &&
