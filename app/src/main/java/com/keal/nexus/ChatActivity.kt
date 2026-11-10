@@ -596,9 +596,9 @@ private fun NexusChatApp(initialPath: String?) {
                                                     ChatMessage(false, "Using " + toolCall.name + "…")
                                                 withContext(Dispatchers.IO) { toolRuntime.execute(toolCall) }
                                             }
-                                            nextPrompt = "Workspace tool execution has completed.\\n" +
+                                            nextPrompt = "Workspace tool execution has completed.\n" +
                                                 toolResult +
-                                                "\\nNow answer the user's original request using this result. Be explicit if the tool failed or permission was denied. Do not output another tool request unless another permitted operation is essential."
+                                                "\nNow answer the user's original request using this result. Be explicit if the tool failed or permission was denied. Do not output another tool request unless another permitted operation is essential."
                                         }
                                     } catch (cancelled: kotlinx.coroutines.CancellationException) {
                                         throw cancelled
@@ -606,6 +606,8 @@ private fun NexusChatApp(initialPath: String?) {
                                         if (messages.isNotEmpty() && messages.last().text.isBlank()) messages.removeAt(messages.lastIndex)
                                         messages.add(ChatMessage(false, "I couldn't generate a response: ${t.message ?: "unknown error"}"))
                                     } finally {
+                                        pendingToolApproval?.decision?.complete(false)
+                                        pendingToolApproval = null
                                         generating = false
                                         generationJob = null
                                     }
