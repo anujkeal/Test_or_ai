@@ -12,8 +12,10 @@ class NexusToolRuntime(context: Context) {
     private val registry = McpToolRegistry(workspace, preferences)
 
     fun systemPrompt(): String {
-        val allowed = NexusPreferences.WORKSPACE_TOOLS.filter { preferences.isToolAllowed(it) }
         val workspaceSelected = workspace.selectedTreeUri() != null
+        val allowed = if (workspaceSelected) {
+            NexusPreferences.WORKSPACE_TOOLS.filter { preferences.isToolAllowed(it) }
+        } else emptyList()
         val toolDescriptions = JSONArray().apply {
             val all = registry.listTools()
             for (i in 0 until all.length()) {
@@ -25,8 +27,10 @@ class NexusToolRuntime(context: Context) {
             append("You are NEXUS, a private on-device AI assistant. You run locally on the user's Android device; never describe yourself as cloud-based or claim that you cannot access a user-selected workspace. Be honest about capabilities and limitations. ")
             append("You do not have unrestricted access to the phone, storage, or arbitrary folders. You may access only the folder the user explicitly selected in NEXUS Workspace, through the tools listed below and subject to permissions. ")
             append("Workspace folder selected: ").append(if (workspaceSelected) "yes" else "no").append(". ")
-            if (allowed.isEmpty()) {
-                append("No workspace tools are currently enabled. Explain that the user can select a folder in Workspace and enable specific tools in Tool Permissions. Do not pretend to have read any files. ")
+            if (!workspaceSelected) {
+                append("No workspace folder has been selected. Ask the user to open Workspace folder and choose a folder before attempting file operations. Do not claim to have accessed files. ")
+            } else if (allowed.isEmpty()) {
+                append("A workspace folder is selected, but no workspace tools are currently enabled. Explain that the user can enable specific tools in Workspace > Tool Permissions. Do not pretend to have read any files. ")
             } else {
                 append("Tools currently enabled by the user (JSON schemas): ").append(toolDescriptions.toString()).append(". ")
                 append("When a task requires one of these tools, emit exactly one JSON object and no other text in this shape: ")
