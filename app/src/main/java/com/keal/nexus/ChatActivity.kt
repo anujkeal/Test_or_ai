@@ -659,7 +659,7 @@ private fun NexusChatApp(initialPath: String?) {
                                             toolRuntime.detectAndroidCommand(prompt) != null ->
                                                 "Android command control is disabled. Enable it in NEXUS Settings first."
                                             deviceActions.isUnrestrictedShellRequest(prompt) ->
-                                                "NEXUS cannot execute arbitrary CMD, PowerShell, ADB shell or terminal commands. Android does not provide Windows CMD, and unrestricted shell access is intentionally blocked. Use the supported app, navigation, flashlight and workspace actions instead."
+                                                "NEXUS cannot run unrestricted Windows CMD, PowerShell or ADB shell commands on Android. It can run a small read-only diagnostic set: pwd, ls, date, id, uname, uptime and df. Try: cmd ls. File access and changes must use the selected NEXUS Workspace."
                                             callMatch != null && androidControlEnabled -> {
                                                 val name = callMatch.groupValues[1].trim()
                                                 selectedCallName = name
