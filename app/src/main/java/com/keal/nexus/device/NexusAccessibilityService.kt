@@ -42,6 +42,72 @@ class NexusAccessibilityService : AccessibilityService() {
         return null
     }
 
+
+    data class VisibleElement(
+        val id: Int,
+        val label: String,
+        val clickable: Boolean,
+        val editable: Boolean,
+        val scrollable: Boolean
+    )
+
+    private fun collectVisibleElements(): List<Pair<VisibleElement, android.view.accessibility.AccessibilityNodeInfo>> {
+        val root = rootInActiveWindow ?: return emptyList()
+        val found = mutableListOf<Pair<VisibleElement, android.view.accessibility.AccessibilityNodeInfo>>()
+        fun visit(node: android.view.accessibility.AccessibilityNodeInfo, depth: Int) {
+            if (depth > 24 || found.size >= 80 || !node.isVisibleToUser) return
+            val label = node.text?.toString()?.trim().orEmpty()
+                .ifBlank { node.contentDescription?.toString()?.trim().orEmpty() }
+            if ((node.isClickable || node.isEditable || node.isScrollable) && label.isNotBlank()) {
+                val duplicate = found.any { it.first.label.equals(label, ignoreCase = true) }
+                if (!duplicate) {
+                    val id = found.size
+                    found += VisibleElement(id, label.take(160), node.isClickable, node.isEditable, node.isScrollable) to node
+                }
+            }
+            for (index in 0 until node.childCount) {
+                val child = node.getChild(index) ?: continue
+                visit(child, depth + 1)
+            }
+        }
+        visit(root, 0)
+        return found
+    }
+
+    private fun visibleScreenText(): String? {
+        val root = rootInActiveWindow ?: return null
+        val packageName = root.packageName?.toString().orEmpty()
+        val elements = collectVisibleElements()
+        return buildString {
+            append("App: ").append(packageName.ifBlank { "unknown" }).append('\n')
+            if (elements.isEmpty()) append("(No accessible interactive elements found)")
+            else elements.forEach { (element, _) ->
+                append(element.id).append(": ").append(element.label)
+                if (element.editable) append(" [text field]")
+                if (element.clickable) append(" [clickable]")
+                if (element.scrollable) append(" [scrollable]")
+                append('\n')
+            }
+        }.take(9000)
+    }
+
+    private fun clickIndexed(id: Int): Boolean {
+        val target = collectVisibleElements().firstOrNull { it.first.id == id }?.second ?: return false
+        var clickable: android.view.accessibility.AccessibilityNodeInfo? = target
+        while (clickable != null && !clickable.isClickable) clickable = clickable.parent
+        return clickable?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK) == true
+    }
+
+    private fun typeIndexed(id: Int, value: String): Boolean {
+        if (value.length > 2000 || value.any { it == '\u0000' }) return false
+        val target = collectVisibleElements().firstOrNull { it.first.id == id } ?: return false
+        if (!target.first.editable || !target.second.isEditable) return false
+        val args = android.os.Bundle().apply {
+            putCharSequence(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value)
+        }
+        return target.second.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+    }
+
     private fun clickVisibleText(label: String): Boolean {
         val root = rootInActiveWindow ?: return false
         val matches = root.findAccessibilityNodeInfosByText(label)
@@ -83,6 +149,14 @@ class NexusAccessibilityService : AccessibilityService() {
 
     companion object {
         @Volatile private var active: NexusAccessibilityService? = null
+
+        fun screenSnapshot(): String? = active?.visibleScreenText()
+
+        fun clickScreenElement(id: Int): Boolean = active?.clickIndexed(id) ?: false
+
+        fun typeScreenElement(id: Int, value: String): Boolean = active?.typeIndexed(id, value) ?: false
+
+        fun isConnected(): Boolean = active != null
 
         fun performGlobalAction(action: Int): Boolean =
             active?.performGlobalAction(action) ?: false
