@@ -189,6 +189,14 @@ private fun NexusChatApp(initialPath: String?) {
     }
 
     LaunchedEffect(modelPath, loadAttempt) {
+        if (prefs.getBoolean("model_load_in_progress", false)) {
+            prefs.edit().putBoolean("model_load_in_progress", false).commit()
+            ready = false
+            loading = false
+            showModels = true
+            loadError = "The previous model load was interrupted while native weights were loading. Android may have stopped NEXUS because of memory pressure or a native model-loading failure. The app has stopped automatic retries. Choose a smaller model, or retry after closing other apps."
+            return@LaunchedEffect
+        }
         prefs.edit().putString("last_model_path", modelPath).apply()
         val path = modelPath
         ready = false
@@ -262,15 +270,20 @@ private fun NexusChatApp(initialPath: String?) {
                         throw IOException(memoryMessage)
                     }
                     loadStage = "Loading model weights"
+                    // Persist before entering JNI: if Android kills the process in native
+                    // code, the next launch must not blindly retry the same model forever.
+                    prefs.edit().putBoolean("model_load_in_progress", true).commit()
                     local.loadModel(requestedPath)
                     loadStage = "Preparing chat"
                     local.setSystemPrompt(toolRuntime.systemPrompt())
+                    prefs.edit().putBoolean("model_load_in_progress", false).commit()
                 } else {
                     loadStage = "Reusing loaded model"
                 }
             }
             ready = true
         } catch (t: Throwable) {
+            prefs.edit().putBoolean("model_load_in_progress", false).commit()
             loadError = buildString {
                 append(t.javaClass.simpleName)
                 t.message?.takeIf { it.isNotBlank() }?.let { append(": ").append(it) }
