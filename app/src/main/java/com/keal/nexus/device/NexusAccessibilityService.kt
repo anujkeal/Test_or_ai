@@ -92,7 +92,11 @@ class NexusAccessibilityService : AccessibilityService() {
     }
 
     private fun clickIndexed(id: Int): Boolean {
-        val target = collectVisibleElements().firstOrNull { it.first.id == id }?.second ?: return false
+        val pair = collectVisibleElements().firstOrNull { it.first.id == id } ?: return false
+        val label = pair.first.label.lowercase()
+        if (listOf("call", "send", "delete", "remove", "pay", "purchase", "transfer", "confirm")
+                .any { Regex("\\b" + Regex.escape(it) + "\\b").containsMatchIn(label) }) return false
+        val target = pair.second
         var clickable: android.view.accessibility.AccessibilityNodeInfo? = target
         while (clickable != null && !clickable.isClickable) clickable = clickable.parent
         return clickable?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK) == true
