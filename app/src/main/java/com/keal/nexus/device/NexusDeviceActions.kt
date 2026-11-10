@@ -170,38 +170,38 @@ class NexusDeviceActions(private val context: Context) {
             else -> null
         }
         if (appName != null) {
-            val packages = mapOf(
-                "youtube" to listOf("com.google.android.youtube"),
-                "youtube music" to listOf("com.google.android.apps.youtube.music"),
-                "chrome" to listOf("com.android.chrome", "com.chrome.beta"),
-                "whatsapp" to listOf("com.whatsapp"),
-                "instagram" to listOf("com.instagram.android"),
-                "spotify" to listOf("com.spotify.music"),
-                "maps" to listOf("com.google.android.apps.maps"),
-                "google maps" to listOf("com.google.android.apps.maps"),
-                "camera" to listOf("com.android.camera2", "com.oplus.camera"),
-                "gallery" to listOf("com.google.android.apps.photos", "com.oplus.gallery"),
-                "settings" to listOf("com.android.settings"),
-                "calculator" to listOf("com.google.android.calculator", "com.android.calculator2"),
-                "google" to listOf("com.google.android.googlequicksearchbox"),
-                "google maps" to listOf("com.google.android.apps.maps"),
-                "google map" to listOf("com.google.android.apps.maps")
+            val shortcut = com.keal.nexus.agent.NexusPreferences(context).appShortcuts()
+                .firstOrNull { it.label.equals(appName, true) }
+            val normalized = appName.lowercase().replace(Regex("[^a-z0-9]+"), " ").trim()
+            val aliases = mapOf(
+                "map" to listOf("maps", "google maps"),
+                "google map" to listOf("maps", "google maps"),
+                "google" to listOf("google", "google search"),
+                "photos" to listOf("photos", "google photos"),
+                "file manager" to listOf("files", "file manager"),
+                "music" to listOf("music", "music player")
             )
-            val packageNames = packages[appName]
-            if (packageNames != null) {
-                for (packageName in packageNames) {
-                    val launch = context.packageManager.getLaunchIntentForPackage(packageName)
-                    if (launch != null) {
-                        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        context.startActivity(launch)
-                        return "Opening $appName."
-                    }
+            val candidates = context.packageManager.queryIntentActivities(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
+            ).map { info ->
+                val label = info.loadLabel(context.packageManager).toString()
+                Triple(label, info.activityInfo.packageName, label.lowercase().replace(Regex("[^a-z0-9]+"), " ").trim())
+            }.distinctBy { it.second }
+            val aliasNames = aliases[normalized].orEmpty()
+            val match = candidates.firstOrNull { it.third == normalized }
+                ?: candidates.firstOrNull { it.third in aliasNames }
+                ?: candidates.firstOrNull { it.third.startsWith("$normalized ") || normalized.startsWith(it.third + " ") }
+            val packageName = shortcut?.packageName ?: match?.second
+            if (packageName != null) {
+                val launch = context.packageManager.getLaunchIntentForPackage(packageName)
+                if (launch != null) {
+                    launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(launch)
+                    return "Opening ${shortcut?.label ?: match?.first ?: appName}."
                 }
-                return "$appName does not appear to be installed."
             }
-            return "I don't have an app shortcut for $appName yet. Try saying the exact app name, or add it to NEXUS app shortcuts."
+            return "I couldn't find an installed app named '$appName'. Open NEXUS Settings → App shortcuts to create your own shortcut from any installed app."
         }
-
         if (lower in listOf("play local music", "open local music", "play music from my phone", "choose local song")) {
             val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_MUSIC)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
