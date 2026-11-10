@@ -1,5 +1,6 @@
 package com.keal.nexus
 
+import android.app.ActivityManager
 import android.app.DownloadManager
 import android.content.Context
 import android.os.Bundle
@@ -50,6 +51,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 import java.util.UUID
 
 private data class PendingToolApproval(
@@ -210,7 +212,8 @@ private fun NexusChatApp(initialPath: String?) {
                     it is InferenceEngine.State.ModelReady ||
                     it is InferenceEngine.State.Error
                 }
-                val requestedPath = File(path).absolutePath
+                val requestedFile = File(path)
+                val requestedPath = requestedFile.absolutePath
                 val modelAlreadyResident =
                     local.state.value is InferenceEngine.State.ModelReady &&
                     local.loadedModelPath == requestedPath
@@ -222,6 +225,25 @@ private fun NexusChatApp(initialPath: String?) {
                     }
                     local.state.first { it is InferenceEngine.State.Initialized || it is InferenceEngine.State.Error }
                         .let { state -> if (state is InferenceEngine.State.Error) throw state.exception }
+                    // Large GGUF models can be terminated by Android's low-memory killer
+                    // during native loading. Check available system RAM before entering JNI.
+                    val memoryInfo = ActivityManager.MemoryInfo()
+                    (context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager)
+                        .getMemoryInfo(memoryInfo)
+                    val modelBytes = requestedFile.length()
+                    val reserveBytes = 512L * 1024L * 1024L
+                    if (modelBytes >= 1_500L * 1024L * 1024L &&
+                        memoryInfo.availMem < modelBytes + reserveBytes
+                    ) {
+                        val availableGb = memoryInfo.availMem / (1024.0 * 1024.0 * 1024.0)
+                        val modelGb = modelBytes / (1024.0 * 1024.0 * 1024.0)
+                        throw IOException(
+                            "Not enough free memory to safely load this model. " +
+                                "Model size: %.2f GB; currently available RAM: %.2f GB. " +
+                                "Close other apps or select Llama 3.2 1B / Qwen2.5 1.5B."
+                                    .format(modelGb, availableGb)
+                        )
+                    }
                     loadStage = "Loading model weights"
                     local.loadModel(requestedPath)
                     loadStage = "Preparing chat"
