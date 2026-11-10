@@ -31,7 +31,7 @@ constexpr int   N_THREADS_MIN           = 2;
 constexpr int   N_THREADS_MAX           = 4;
 constexpr int   N_THREADS_HEADROOM      = 2;
 
-constexpr int   DEFAULT_CONTEXT_SIZE    = 1024;
+constexpr int   DEFAULT_CONTEXT_SIZE    = 2048;
 constexpr int   OVERFLOW_HEADROOM       = 4;
 constexpr int   BATCH_SIZE              = 16;
 constexpr float DEFAULT_SAMPLER_TEMP    = 0.3f;
@@ -499,12 +499,23 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_processUserPrompt(
         LOGv("token: `%s`\t -> `%d`", common_token_to_piece(g_context, id).c_str(), id);
     }
 
-    // Ensure user prompt doesn't exceed the context size by truncating if necessary.
-    const int max_batch_size = DEFAULT_CONTEXT_SIZE - OVERFLOW_HEADROOM;
-    if ((int) user_tokens.size() > max_batch_size) {
-        const int skipped_tokens = (int) user_tokens.size() - max_batch_size;
-        user_tokens.resize(max_batch_size);
-        LOGw("%s: User prompt too long! Skipped %d tokens!", __func__, skipped_tokens);
+    // Preserve the system prompt and the newest part of the user's message.
+    // If older conversation turns occupy the cache, discard their oldest half first.
+    const int max_position = DEFAULT_CONTEXT_SIZE - OVERFLOW_HEADROOM;
+    if (current_position + (llama_pos) user_tokens.size() > max_position &&
+        current_position > system_prompt_position) {
+        shift_context();
+    }
+    const int available_tokens = std::max(0, max_position - (int) current_position);
+    if ((int) user_tokens.size() > available_tokens) {
+        const int skipped_tokens = (int) user_tokens.size() - available_tokens;
+        user_tokens.erase(user_tokens.begin(), user_tokens.begin() + skipped_tokens);
+        LOGw("%s: User prompt exceeded remaining context; kept newest %d tokens and skipped %d.",
+             __func__, (int) user_tokens.size(), skipped_tokens);
+    }
+    if (user_tokens.empty()) {
+        LOGe("%s: No room remains for user tokens after preserving the system prompt.", __func__);
+        return 3;
     }
     const int user_prompt_size = (int) user_tokens.size();
 
