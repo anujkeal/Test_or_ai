@@ -140,23 +140,37 @@ private fun NexusChatApp(initialPath: String?) {
     var selectedCallName by remember { mutableStateOf<String?>(null) }
     val contactPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val contactUri = result.data?.data
+        val requestedName = selectedCallName ?: "contact"
         if (result.resultCode == android.app.Activity.RESULT_OK && contactUri != null) {
-            val phone = runCatching {
+            val selectedContact = runCatching {
                 context.contentResolver.query(
                     contactUri,
-                    arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
+                    arrayOf(
+                        ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                        ContactsContract.CommonDataKinds.Phone.NUMBER
+                    ),
                     null, null, null
                 )?.use { cursor ->
-                    if (cursor.moveToFirst()) cursor.getString(0) else null
+                    if (cursor.moveToFirst()) {
+                        cursor.getString(0).orEmpty() to cursor.getString(1).orEmpty()
+                    } else null
                 }
             }.getOrNull()
+            val phone = selectedContact?.second
             if (!phone.isNullOrBlank()) {
                 val dialIntent = Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", phone, null))
-                runCatching { context.startActivity(dialIntent) }
-                    .onFailure { messages.add(ChatMessage(false, "I couldn't open the phone dialer: ${it.message ?: "no dialer available"}")) }
+                runCatching {
+                    context.startActivity(dialIntent)
+                    messages.add(ChatMessage(false,
+                        "Opened the phone dialer for ${selectedContact.first.ifBlank { requestedName }}. Review the number and tap the call button to place the call."))
+                }.onFailure {
+                    messages.add(ChatMessage(false, "I found the contact, but couldn't open the phone dialer: ${it.message ?: "no dialer available"}"))
+                }
             } else {
-                messages.add(ChatMessage(false, "I couldn't read the selected phone number. Please try another contact."))
+                messages.add(ChatMessage(false, "I couldn't read a phone number for that contact. Please choose a contact with a saved phone number."))
             }
+        } else if (result.resultCode != android.app.Activity.RESULT_OK) {
+            messages.add(ChatMessage(false, "Contact selection cancelled. No call was placed."))
         }
         selectedCallName = null
     }
