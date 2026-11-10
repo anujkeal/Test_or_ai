@@ -789,7 +789,11 @@ private fun NexusChatApp(initialPath: String?) {
                                         if (messages.isNotEmpty()) messages[messages.lastIndex] =
                                             ChatMessage(false, "NEXUS stopped this request because generation took too long. Please try again with a shorter request or a smaller model.")
                                     } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                                        if (messages.isNotEmpty() && messages.last().text.isBlank()) messages.removeAt(messages.lastIndex)
+                                        val stoppedByUser = messages.isNotEmpty() && messages.last().text.isBlank()
+                                        if (stoppedByUser) {
+                                            messages.removeAt(messages.lastIndex)
+                                            runCatching { engine?.resetConversation(toolRuntime.systemPrompt()) }
+                                        }
                                         throw cancelled
                                     } catch (t: Throwable) {
                                         if (messages.isNotEmpty() && messages.last().text.isBlank()) messages.removeAt(messages.lastIndex)
