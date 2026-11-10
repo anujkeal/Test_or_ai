@@ -1,3 +1,13 @@
+## V0.12.2 — Reliable local agent and safe diagnostics
+
+- Shortens the on-device system prompt so smaller local models have room to process user messages and tool calls
+- Accepts common Llama JSON tool-call formats, including `name` + `parameters`, nested function calls, and tool-call arrays
+- Adds a bounded 2,048-token native context and truncates oversized incoming prompts to the remaining available context instead of failing immediately
+- Routes explicit supported CMD diagnostic requests directly, without depending on the model to invent valid JSON
+- Adds read-only app-sandbox diagnostics: `pwd`, `ls`, `date`, `id`, `uname`, `uptime`, `df`, device model and Android version
+- Does not provide Windows CMD, PowerShell, ADB shell, unrestricted shell execution, root or arbitrary commands
+- Reports context overflow with a clearer message
+
 ## V0.12.1 — Reliable device commands and native context handling
 
 - Routes explicitly supported device commands through deterministic Android handlers instead of depending on a small local model to emit tool-call JSON
