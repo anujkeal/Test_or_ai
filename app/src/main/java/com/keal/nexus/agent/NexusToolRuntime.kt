@@ -212,33 +212,47 @@ class NexusToolRuntime(context: Context) {
     private fun executeAndroidAction(call: NexusToolCall): String {
         if (!preferences.androidControlEnabled) return "Android action blocked: enable Android command control in NEXUS Settings first."
         val args = call.arguments
+        fun onlyKeys(vararg allowed: String): Boolean {
+            val iterator = args.keys()
+            while (iterator.hasNext()) if (iterator.next() !in allowed) return false
+            return true
+        }
         val command = when (call.name) {
             "android.open_app" -> {
+                if (!onlyKeys("app") || !args.has("app")) return "Blocked by NEXUS security policy: invalid app arguments."
                 val app = args.optString("app")
                 if (app !in ALLOWED_APPS) return "Blocked by NEXUS security policy: app is not on the allowlist."
                 "open " + app.replace('_', ' ')
             }
             "android.youtube_search" -> {
+                if (!onlyKeys("query") || !args.has("query")) return "Blocked by NEXUS security policy: invalid YouTube search arguments."
                 val query = args.optString("query").trim()
                 if (query.isBlank() || query.length > 120 || query.any { it.code < 0x20 || it.code == 0x7f }) {
                     return "Blocked by NEXUS security policy: invalid YouTube search query."
                 }
                 "open youtube and play $query"
             }
-            "android.navigate" -> when (args.optString("action")) {
+            "android.navigate" -> {
+                if (!onlyKeys("action") || !args.has("action")) return "Blocked by NEXUS security policy: invalid navigation arguments."
+                when (args.optString("action")) {
                 "back" -> "go back"
                 "home" -> "go home"
                 "notifications" -> "open notifications"
                 "quick_settings" -> "open quick settings"
                 else -> return "Blocked by NEXUS security policy: unsupported navigation action."
+                }
             }
-            "android.scroll" -> when (args.optString("direction")) {
+            "android.scroll" -> {
+                if (!onlyKeys("direction") || !args.has("direction")) return "Blocked by NEXUS security policy: invalid scroll arguments."
+                when (args.optString("direction")) {
                 "up" -> "scroll up"
                 "down" -> "scroll down"
                 else -> return "Blocked by NEXUS security policy: unsupported scroll direction."
+                }
             }
             "android.flashlight" -> {
-                if (!args.has("enabled")) return "Blocked by NEXUS security policy: flashlight state is missing."
+                if (!onlyKeys("enabled") || !args.has("enabled") || args.isNull("enabled") ||
+                    args.opt("enabled") !is Boolean) return "Blocked by NEXUS security policy: flashlight state is missing."
                 if (args.optBoolean("enabled")) "turn on flashlight" else "turn off flashlight"
             }
             else -> return "Blocked by NEXUS security policy: unknown Android action."
