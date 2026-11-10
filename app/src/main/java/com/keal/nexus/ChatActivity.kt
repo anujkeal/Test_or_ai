@@ -32,6 +32,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arm.aichat.AiChat
 import com.arm.aichat.InferenceEngine
+import com.keal.nexus.data.ChatHistoryStore
+import com.keal.nexus.data.SavedChat
+import com.keal.nexus.data.SavedChatMessage
 import com.keal.nexus.data.ModelCatalog
 import com.keal.nexus.data.ModelManager
 import com.keal.nexus.data.ModelSpec
@@ -44,6 +47,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.UUID
 
 private const val NEXUS_SYSTEM_PROMPT = "You are NEXUS, a helpful, clear and thoughtful on-device AI assistant. Answer accurately and naturally."
 
@@ -100,6 +104,9 @@ private fun NexusChatApp(initialPath: String?) {
     var generationJob by remember { mutableStateOf<Job?>(null) }
     var showModels by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
+    var chatHistory by remember { mutableStateOf(ChatHistoryStore.load(context)) }
+    var currentChatId by remember { mutableStateOf(UUID.randomUUID().toString()) }
     var showMenu by remember { mutableStateOf(false) }
     var downloadId by remember { mutableStateOf(prefs.getLong("active_download_id", -1L).takeIf { it >= 0L }) }
     var downloadModel by remember { mutableStateOf(ModelCatalog.models.firstOrNull { it.id == prefs.getString("active_download_model_id", null) }) }
@@ -203,6 +210,11 @@ private fun NexusChatApp(initialPath: String?) {
                 local.loadModel(File(path).absolutePath)
                 loadStage = "Preparing chat"
                 local.setSystemPrompt(NEXUS_SYSTEM_PROMPT)
+                // Rebuild the model's in-memory context from the active locally saved transcript.
+                val priorTurns = messages.filter { it.user }.takeLast(8)
+                priorTurns.forEach { turn ->
+                    local.sendUserPrompt(turn.text, 512).collect()
+                }
             }
             ready = true
         } catch (t: Throwable) {
@@ -236,6 +248,59 @@ private fun NexusChatApp(initialPath: String?) {
                 }
             } finally {
                 loading = false
+            }
+        }
+    }
+
+    // Persist the active transcript locally whenever a message is added or a streamed reply changes.
+    val messageSnapshot = messages.toList()
+    LaunchedEffect(currentChatId, messageSnapshot) {
+        if (messageSnapshot.isNotEmpty()) {
+            ChatHistoryStore.save(
+                context,
+                currentChatId,
+                messageSnapshot.map { SavedChatMessage(it.user, it.text) }
+            )
+            chatHistory = ChatHistoryStore.load(context)
+        }
+    }
+
+    fun startNewChat() {
+        if (messages.isNotEmpty()) {
+            ChatHistoryStore.save(context, currentChatId, messages.map { SavedChatMessage(it.user, it.text) })
+            chatHistory = ChatHistoryStore.load(context)
+        }
+        currentChatId = UUID.randomUUID().toString()
+        if (ready || generating) resetChat()
+        else { messages.clear(); input = "" }
+    }
+
+    fun openSavedChat(chat: SavedChat) {
+        scope.launch {
+            generationJob?.cancelAndJoin()
+            generationJob = null
+            generating = false
+            messages.clear()
+            messages.addAll(chat.messages.map { ChatMessage(it.user, it.text) })
+            currentChatId = chat.id
+            input = ""
+            showHistory = false
+            if (ready && engine != null) {
+                ready = false
+                loading = true
+                try {
+                    engine?.resetConversation(NEXUS_SYSTEM_PROMPT)
+                    chat.messages.filter { it.user }.takeLast(8).forEach { turn ->
+                        engine?.sendUserPrompt(turn.text, 512)?.collect()
+                    }
+                    ready = true
+                } catch (t: Throwable) {
+                    loadError = t.message ?: "Could not restore this conversation."
+                } finally {
+                    loading = false
+                }
+            } else if (modelPath.isNullOrBlank()) {
+                showModels = true
             }
         }
     }
@@ -352,14 +417,14 @@ private fun NexusChatApp(initialPath: String?) {
                         ) {
                             MenuEntry("＋", "New chat") {
                                 showMenu = false
-                                if (ready || generating) resetChat()
-                                else { messages.clear(); input = "" }
+                                startNewChat()
                             }
                             MenuEntry("▱", "Workspace folder") {
                                 showMenu = false
                                 context.startActivity(android.content.Intent(context, com.keal.nexus.agent.AgentActivity::class.java))
                             }
                             MenuEntry("◇", "Models") { showMenu = false; showModels = true }
+                            MenuEntry("◷", "Chat history") { showMenu = false; showHistory = true }
                             MenuEntry("☷", "Settings") { showMenu = false; showSettings = true }
                         }
                     }
@@ -634,6 +699,50 @@ private fun NexusChatApp(initialPath: String?) {
                                 Text("Imported · ${formatSize(file.length())}", color = mutedText, fontSize = 13.sp)
                             }
                             if (file.absolutePath == modelPath) Text("✓", color = NexusMint, fontSize = 24.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        if (showHistory) {
+            ModalBottomSheet(
+                onDismissRequest = { showHistory = false },
+                containerColor = surface,
+                contentColor = primaryText,
+                dragHandle = { BottomSheetHandle(border) }
+            ) {
+                Column(
+                    Modifier.fillMaxWidth().heightIn(max = 680.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 22.dp).padding(bottom = 28.dp)
+                ) {
+                    Text("Chat history", color = primaryText, fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(5.dp))
+                    Text("Your conversations are saved privately on this device.", color = mutedText, fontSize = 14.sp)
+                    Spacer(Modifier.height(16.dp))
+                    HorizontalDivider(color = border)
+                    if (chatHistory.isEmpty()) {
+                        Column(Modifier.fillMaxWidth().padding(vertical = 38.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("No saved conversations yet", color = primaryText, fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.height(6.dp))
+                            Text("Your chats will appear here automatically.", color = mutedText, fontSize = 13.sp)
+                        }
+                    } else {
+                        chatHistory.forEach { chat ->
+                            Row(
+                                Modifier.fillMaxWidth().clickable { openSavedChat(chat) }.padding(vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(chat.title, color = primaryText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
+                                    Spacer(Modifier.height(4.dp))
+                                    Text("${chat.messages.size} messages · ${java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT).format(java.util.Date(chat.updatedAt))}",
+                                        color = mutedText, fontSize = 12.sp)
+                                }
+                                Text("›", color = mutedText, fontSize = 25.sp)
+                            }
+                            HorizontalDivider(color = border)
                         }
                     }
                 }
