@@ -99,7 +99,7 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_load(JNIEnv *env, jobject, jstr
 
     const auto *model_path = env->GetStringUTFChars(jmodel_path, 0);
     if (model_path == nullptr) return 2;
-    LOGi("NEXUS native load started (mmap=true, mlock=false)");
+    LOGi("NEXUS native load started using pinned llama.cpp model defaults");
     log_memory_snapshot("before model load");
     const auto load_started = std::chrono::steady_clock::now();
     auto *model = llama_model_load_from_file(model_path, model_params);
