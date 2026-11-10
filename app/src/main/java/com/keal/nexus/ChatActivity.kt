@@ -7,6 +7,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.ContactsContract
 import com.keal.nexus.device.NexusDeviceActions
+import com.keal.nexus.device.NexusAccessibilityService
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -39,6 +40,7 @@ import com.arm.aichat.AiChat
 import com.arm.aichat.InferenceEngine
 import com.keal.nexus.agent.NexusToolCall
 import com.keal.nexus.agent.NexusToolRuntime
+import com.keal.nexus.agent.PhoneControlAgent
 import com.keal.nexus.data.ChatHistoryStore
 import com.keal.nexus.data.SavedChat
 import com.keal.nexus.data.SavedChatMessage
@@ -665,7 +667,97 @@ private fun NexusChatApp(initialPath: String?) {
                                         val callMatch = Regex("^(?:please\\s+)?(?:call|dial|phone)\\s+(?:my\\s+)?(.+)$", RegexOption.IGNORE_CASE).matchEntire(prompt)
                                         val deviceActions = NexusDeviceActions(context.applicationContext)
                                         val androidControlEnabled = prefs.getBoolean("android_control_enabled", false)
-                                        val deviceResult = when {
+                                        val phoneAgentResult = if (PhoneControlAgent.isMultiStepGoal(prompt)) {
+                                            if (!androidControlEnabled) {
+                                                "Phone control is disabled. Enable Android command control in NEXUS Settings first."
+                                            } else if (!NexusAccessibilityService.isConnected()) {
+                                                "Phone control needs NEXUS app interaction. Enable it in Android Settings → Accessibility, then try again."
+                                            } else {
+                                                val actionHistory = mutableListOf<String>()
+                                                var screen = NexusAccessibilityService.screenSnapshot()
+                                                var finalResult: String? = null
+                                                var step = 0
+                                                while (step < 8 && finalResult == null) {
+                                                    if (screen.isNullOrBlank()) {
+                                                        finalResult = "I cannot read the current screen. Keep the target app open and make sure NEXUS Accessibility is enabled."
+                                                        break
+                                                    }
+                                                    val rawAction = StringBuilder()
+                                                    withTimeout(30_000L) {
+                                                        activeEngine.sendUserPrompt(
+                                                            PhoneControlAgent.stepPrompt(prompt, actionHistory, screen),
+                                                            160
+                                                        ).collect { token -> rawAction.append(token) }
+                                                    }
+                                                    val action = PhoneControlAgent.parse(rawAction.toString())
+                                                    if (action == null) {
+                                                        finalResult = "I couldn't get a valid one-action JSON instruction from the model. Try a shorter phone task."
+                                                        break
+                                                    }
+                                                    val summary = when (action.action) {
+                                                        "open_app" -> "open_app ${action.name}"
+                                                        "click" -> "click ${action.id}"
+                                                        "type" -> "type ${action.id}"
+                                                        "scroll" -> "scroll ${action.direction}"
+                                                        else -> action.action
+                                                    }
+                                                    if (actionHistory.lastOrNull()?.substringBefore(" -> ") == summary) {
+                                                        finalResult = "I stopped because the model repeated the same action. No further action was taken."
+                                                        break
+                                                    }
+                                                    when (action.action) {
+                                                        "done" -> finalResult = "Completed: $prompt"
+                                                        "fail" -> finalResult = action.reason?.ifBlank { "The phone agent could not continue." }
+                                                            ?: "The phone agent could not continue."
+                                                        "open_app" -> {
+                                                            val result = deviceActions.execute("open ${action.name}")
+                                                            if (result == null || result.startsWith("I couldn't", true) || result.startsWith("I could not", true)) {
+                                                                finalResult = result ?: "That app could not be opened."
+                                                            } else actionHistory += "$summary -> $result"
+                                                        }
+                                                        "click" -> {
+                                                            val id = action.id!!
+                                                            val line = screen.lineSequence().firstOrNull { it.substringBefore(":").trim().toIntOrNull() == id }
+                                                            val label = line?.substringAfter(":")?.substringBefore(" [")?.trim()
+                                                            if (line == null) {
+                                                                finalResult = "The model selected an id that is not on the current screen. I stopped safely."
+                                                            } else if (PhoneControlAgent.isSensitiveTarget(label.orEmpty())) {
+                                                                finalResult = "I found a sensitive control ($label). Please tap it yourself to confirm."
+                                                            } else if (!NexusAccessibilityService.clickScreenElement(id)) {
+                                                                finalResult = "I couldn't tap screen item $id. The screen may have changed; please try again."
+                                                            } else actionHistory += "$summary -> tapped $label"
+                                                        }
+                                                        "type" -> {
+                                                            val id = action.id!!
+                                                            val line = screen.lineSequence().firstOrNull { it.substringBefore(":").trim().toIntOrNull() == id }
+                                                            if (line == null || "[text field]" !in line) {
+                                                                finalResult = "The selected id is not an editable text field on the current screen."
+                                                            } else if (!NexusAccessibilityService.typeScreenElement(id, action.text.orEmpty())) {
+                                                                finalResult = "I couldn't type into that field. Please tap the field and try again."
+                                                            } else actionHistory += "$summary -> typed text"
+                                                        }
+                                                        "scroll" -> {
+                                                            val ok = NexusAccessibilityService.scroll(action.direction.orEmpty())
+                                                            if (!ok) finalResult = "I couldn't find a scrollable area on this screen."
+                                                            else actionHistory += "$summary -> completed"
+                                                        }
+                                                        "back" -> {
+                                                            val ok = NexusAccessibilityService.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+                                                            if (!ok) finalResult = "Android Back is unavailable. Check NEXUS Accessibility permission."
+                                                            else actionHistory += "$summary -> completed"
+                                                        }
+                                                    }
+                                                    if (finalResult == null) {
+                                                        step++
+                                                        messages[messages.lastIndex] = ChatMessage(false, "Phone control · step ${step}/8\n${actionHistory.lastOrNull().orEmpty()}")
+                                                        delay(900)
+                                                        screen = NexusAccessibilityService.screenSnapshot()
+                                                    }
+                                                }
+                                                finalResult ?: "I stopped after 8 actions to keep phone control bounded. Tell me to continue if the task is not finished."
+                                            }
+                                        } else null
+                                        val deviceResult = phoneAgentResult ?: when {
                                             toolRuntime.androidCommandHelpResponse(prompt) != null ->
                                                 toolRuntime.androidCommandHelpResponse(prompt)!!
                                             toolRuntime.detectAndroidCommand(prompt) != null && androidControlEnabled -> {
