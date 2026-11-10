@@ -156,7 +156,7 @@ class NexusToolRuntime(context: Context) {
             "what android version is this", "show android version", "get android version" -> "android_version"
             else -> null
         }
-        if (command !in commands && command !in setOf("device_model", "android_version")) return null
+        if (command == null || (command !in commands && command !in setOf("device_model", "android_version"))) return null
         return NexusToolCall("android.run_command", JSONObject().put("command", command))
     }
 
