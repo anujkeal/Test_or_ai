@@ -475,7 +475,7 @@ private fun NexusChatApp(initialPath: String?) {
                                 Spacer(Modifier.height(22.dp))
                                 CircularProgressIndicator(color = NexusPurple, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
                                 Spacer(Modifier.height(8.dp))
-                                Text("Loading model…", color = mutedText, fontSize = 13.sp)
+                                Text(if (restoringHistory) "Restoring conversation…" else "$loadStage…", color = mutedText, fontSize = 13.sp)
                             }
                             if (loadError != null) {
                                 Spacer(Modifier.height(18.dp))
