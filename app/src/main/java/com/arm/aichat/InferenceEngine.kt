@@ -13,6 +13,9 @@ interface InferenceEngine {
      */
     val state: StateFlow<State>
 
+    /** Absolute path of the model currently resident in native memory, if any. */
+    val loadedModelPath: String?
+
     /**
      * Load a model from the given path.
      *
