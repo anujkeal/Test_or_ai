@@ -579,7 +579,7 @@ private fun NexusChatApp(initialPath: String?) {
                                             }
                                             toolCallCount++
                                             val destructive = toolCall.name == "workspace.write_file" || toolCall.name == "workspace.delete_file"
-                                            val toolResult = if (destructive) {
+                                            val toolResult = if (destructive && toolRuntime.isAllowed(toolCall)) {
                                                 val decision = CompletableDeferred<Boolean>()
                                                 pendingToolApproval = PendingToolApproval(toolCall, decision)
                                                 if (messages.isNotEmpty()) messages[messages.lastIndex] =
@@ -592,7 +592,7 @@ private fun NexusChatApp(initialPath: String?) {
                                                     "Tool not executed: you declined the requested action."
                                                 }
                                             } else {
-                                                if (messages.isNotEmpty()) messages[messages.lastIndex] =
+                                                if (!destructive && messages.isNotEmpty()) messages[messages.lastIndex] =
                                                     ChatMessage(false, "Using " + toolCall.name + "…")
                                                 withContext(Dispatchers.IO) { toolRuntime.execute(toolCall) }
                                             }
