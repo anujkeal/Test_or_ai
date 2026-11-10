@@ -80,7 +80,7 @@ class NexusDeviceActions(private val context: Context) {
             return "I opened the timer for $amount $unit. Please start it in the Clock app."
         }
 
-        if (lower.startsWith("play ") || lower.startsWith("search youtube for ") || lower.startsWith("find on youtube ")) {
+        if ((lower.startsWith("play ") && lower !in listOf("play local music", "play music from my phone")) || lower.startsWith("search youtube for ") || lower.startsWith("find on youtube ")) {
             val query = when {
                 lower.startsWith("search youtube for ") -> command.substringAfter("search youtube for ", "")
                 lower.startsWith("find on youtube ") -> command.substringAfter("find on youtube ", "")
