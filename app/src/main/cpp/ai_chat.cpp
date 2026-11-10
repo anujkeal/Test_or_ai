@@ -90,9 +90,8 @@ extern "C"
 JNIEXPORT jint JNICALL
 Java_com_arm_aichat_internal_InferenceEngineImpl_load(JNIEnv *env, jobject, jstring jmodel_path) {
     llama_model_params model_params = llama_model_default_params();
-    // Keep weights file-backed: do not lock all model pages into physical RAM.
-    model_params.use_mmap = true;
-    model_params.use_mlock = false;
+    // Use llama.cpp defaults for model mapping and page locking. This pinned
+    // llama.cpp revision does not expose use_mmap/use_mlock in model params.
     {
         std::lock_guard<std::mutex> lock(g_error_mutex);
         g_last_model_error.clear();
