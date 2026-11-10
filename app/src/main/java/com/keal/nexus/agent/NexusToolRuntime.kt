@@ -149,7 +149,7 @@ class NexusToolRuntime(context: Context) {
     fun detectAndroidCommand(prompt: String): NexusToolCall? {
         val text = prompt.trim().lowercase()
         val commands = setOf("pwd", "ls", "date", "id", "uname", "uptime", "df")
-        val match = Regex("""^(?:(?:please\s+)?(?:run|execute)\s+(?:the\s+)?(?:cmd\s+)?|(?:use\s+cmd\s+to\s+run\s+)|cmd\s+)(pwd|ls|date|id|uname|uptime|df)$""")
+        val match = Regex("""^(?:(?:please\s+)?(?:run|execute)\s+(?:the\s+)?(?:(?:cmd|command|terminal)\s+)?|(?:use\s+cmd\s+to\s+run\s+)|cmd\s+)(pwd|ls|date|id|uname|uptime|df)$""")
             .matchEntire(text)
         val command = match?.groupValues?.get(1) ?: when (text) {
             "what is my device model", "show device model", "get device model" -> "device_model"
