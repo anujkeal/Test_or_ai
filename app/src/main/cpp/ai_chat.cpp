@@ -31,7 +31,7 @@ constexpr int   N_THREADS_HEADROOM      = 2;
 
 constexpr int   DEFAULT_CONTEXT_SIZE    = 1024;
 constexpr int   OVERFLOW_HEADROOM       = 4;
-constexpr int   BATCH_SIZE              = 32;
+constexpr int   BATCH_SIZE              = 16;
 constexpr float DEFAULT_SAMPLER_TEMP    = 0.3f;
 
 static llama_model                      * g_model;
