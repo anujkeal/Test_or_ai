@@ -248,12 +248,16 @@ private fun NexusChatApp(initialPath: String?) {
                         val availableGb = memoryInfo.availMem / (1024.0 * 1024.0 * 1024.0)
                         val requiredGb = requiredFreeBytes / (1024.0 * 1024.0 * 1024.0)
                         val modelGb = modelBytes / (1024.0 * 1024.0 * 1024.0)
-                        throw IOException(
+                        val memoryMessage = String.format(
+                            java.util.Locale.US,
                             "NEXUS stopped before loading to protect your phone from running out of memory. " +
                                 "Model size: %.2f GB; free RAM: %.2f GB; estimated safe minimum: %.2f GB. " +
-                                "Close other apps or choose Llama 3.2 1B / Qwen2.5 1.5B."
-                                    .format(modelGb, availableGb, requiredGb)
+                                "Close other apps or choose Llama 3.2 1B / Qwen2.5 1.5B.",
+                            modelGb,
+                            availableGb,
+                            requiredGb
                         )
+                        throw IOException(memoryMessage)
                     }
                     loadStage = "Loading model weights"
                     local.loadModel(requestedPath)
