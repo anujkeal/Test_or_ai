@@ -13,8 +13,32 @@ class NexusAccessibilityService : AccessibilityService() {
         active = this
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
-    override fun onInterrupt() = Unit
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (event?.packageName?.toString() != "com.google.android.youtube") return
+        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
+            event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        if (!pendingYouTubeAutoplay) return
+        val root = rootInActiveWindow ?: return
+        val target = findFirstYouTubeVideoTitle(root) ?: return
+        pendingYouTubeAutoplay = false
+        var clickable: android.view.accessibility.AccessibilityNodeInfo? = target
+        while (clickable != null && !clickable.isClickable) clickable = clickable.parent
+        clickable?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
+    }
+
+    private fun findFirstYouTubeVideoTitle(
+        node: android.view.accessibility.AccessibilityNodeInfo
+    ): android.view.accessibility.AccessibilityNodeInfo? {
+        val id = node.viewIdResourceName.orEmpty()
+        if (id.contains("video_title", ignoreCase = true) ||
+            id.contains("video_item", ignoreCase = true)) return node
+        for (index in 0 until node.childCount) {
+            val child = node.getChild(index) ?: continue
+            val match = findFirstYouTubeVideoTitle(child)
+            if (match != null) return match
+        }
+        return null
+    }
 
     private fun clickVisibleText(label: String): Boolean {
         val root = rootInActiveWindow ?: return false
@@ -66,5 +90,13 @@ class NexusAccessibilityService : AccessibilityService() {
         fun typeIntoFocusedField(value: String): Boolean = active?.typeIntoFocusedField(value) ?: false
 
         fun scroll(direction: String): Boolean = active?.scroll(direction) ?: false
+
+        @Volatile private var pendingYouTubeAutoplay = false
+
+        fun armYouTubeAutoplay(): Boolean {
+            val service = active ?: return false
+            service.pendingYouTubeAutoplay = true
+            return true
+        }
     }
 }
