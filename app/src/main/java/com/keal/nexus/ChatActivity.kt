@@ -200,20 +200,29 @@ private fun NexusChatApp(initialPath: String?) {
                     it is InferenceEngine.State.ModelReady ||
                     it is InferenceEngine.State.Error
                 }
-                when (local.state.value) {
-                    is InferenceEngine.State.ModelReady, is InferenceEngine.State.Error -> local.cleanUp()
-                    else -> Unit
-                }
-                local.state.first { it is InferenceEngine.State.Initialized || it is InferenceEngine.State.Error }
-                    .let { state -> if (state is InferenceEngine.State.Error) throw state.exception }
-                loadStage = "Loading model weights"
-                local.loadModel(File(path).absolutePath)
-                loadStage = "Preparing chat"
-                local.setSystemPrompt(NEXUS_SYSTEM_PROMPT)
-                // Rebuild the model's in-memory context from the active locally saved transcript.
-                val priorTurns = messages.filter { it.user }.takeLast(8)
-                priorTurns.forEach { turn ->
-                    local.sendUserPrompt(turn.text, 512).collect { }
+                val requestedPath = File(path).absolutePath
+                val modelAlreadyResident =
+                    local.state.value is InferenceEngine.State.ModelReady &&
+                    local.loadedModelPath == requestedPath
+
+                if (!modelAlreadyResident) {
+                    when (local.state.value) {
+                        is InferenceEngine.State.ModelReady, is InferenceEngine.State.Error -> local.cleanUp()
+                        else -> Unit
+                    }
+                    local.state.first { it is InferenceEngine.State.Initialized || it is InferenceEngine.State.Error }
+                        .let { state -> if (state is InferenceEngine.State.Error) throw state.exception }
+                    loadStage = "Loading model weights"
+                    local.loadModel(requestedPath)
+                    loadStage = "Preparing chat"
+                    local.setSystemPrompt(NEXUS_SYSTEM_PROMPT)
+                    // Rebuild recent context only after a fresh native model load.
+                    val priorTurns = messages.filter { it.user }.takeLast(8)
+                    priorTurns.forEach { turn ->
+                        local.sendUserPrompt(turn.text, 512).collect { }
+                    }
+                } else {
+                    loadStage = "Reusing loaded model"
                 }
             }
             ready = true
@@ -427,7 +436,7 @@ private fun NexusChatApp(initialPath: String?) {
                             MenuEntry("◷", "Chat history") { showMenu = false; showHistory = true }
                             MenuEntry("◉", "Voice animation") {
                                 showMenu = false
-                                context.startActivity(android.content.Intent(context, VoiceActivity::class.java))
+                                context.startActivity(android.content.Intent(context, VoiceActivity::class.java).putExtra(VoiceActivity.EXTRA_MODEL_PATH, modelPath))
                             }
                             MenuEntry("☷", "Settings") { showMenu = false; showSettings = true }
                         }
