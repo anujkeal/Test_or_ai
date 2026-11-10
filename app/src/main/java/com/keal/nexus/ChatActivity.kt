@@ -234,16 +234,19 @@ private fun NexusChatApp(initialPath: String?) {
                     if (modelBytes <= 0L) {
                         throw IOException("The selected GGUF file is empty or unavailable. Re-download or re-import the model.")
                     }
-                    // llama.cpp needs memory beyond the GGUF file itself for tensors,
-                    // the KV cache, compute buffers and Android's own working set.
-                    // A file-size-plus-512MB check was too optimistic for 3B Q4 models
-                    // and allowed Android to kill the whole app during native loading.
+                    // llama.cpp loads GGUF weights with mmap by default: the file is
+                    // not duplicated as a second full in-memory model allocation.
+                    // Reserve additional RAM for the KV cache, compute buffers and Android.
+                    // The previous 2x-file-size + 1 GiB estimate rejected this 3B model
+                    // even with 3.37 GiB available, despite the mapped-weight design.
                     val gib = 1024L * 1024L * 1024L
-                    val requiredFreeBytes = if (modelBytes >= 1_500L * 1024L * 1024L) {
-                        modelBytes * 2L + gib
+                    val largeModelThreshold = 1_500L * 1024L * 1024L
+                    val runtimeReserve = if (modelBytes >= largeModelThreshold) {
+                        768L * 1024L * 1024L
                     } else {
-                        modelBytes * 3L / 2L + 512L * 1024L * 1024L
+                        512L * 1024L * 1024L
                     }
+                    val requiredFreeBytes = modelBytes + runtimeReserve
                     if (memoryInfo.lowMemory || memoryInfo.availMem < requiredFreeBytes) {
                         val availableGb = memoryInfo.availMem / (1024.0 * 1024.0 * 1024.0)
                         val requiredGb = requiredFreeBytes / (1024.0 * 1024.0 * 1024.0)
