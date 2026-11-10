@@ -32,6 +32,19 @@ class WorkspaceStore(private val context: Context) {
         return name
     }
 
+    fun describeFilePath(name: String): String {
+        val safe = safeName(name)
+        val directory = root()
+        val exists = directory.findFile(safe)?.isFile == true
+        return buildString {
+            append("Selected workspace: ").append(directory.name ?: "Selected folder").append("\\n")
+            append("Relative file path: ").append(safe).append("\\n")
+            append("File exists: ").append(if (exists) "yes" else "no")
+            append(if (exists) "\\nThis file is directly inside the selected workspace folder."
+                else "\\nThis file has not been found in the selected workspace folder.")
+        }
+    }
+
     fun listFiles(): List<String> = root().listFiles().filter { it.isFile }
         .mapNotNull { it.name }.sortedBy { it.lowercase() }
 
