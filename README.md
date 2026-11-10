@@ -1,3 +1,12 @@
+## V0.12.1 — Reliable device commands and native context handling
+
+- Routes explicitly supported device commands through deterministic Android handlers instead of depending on a small local model to emit tool-call JSON
+- Gives a clear Settings instruction when Android command control is disabled, rather than letting the model hallucinate an action
+- Explicitly rejects arbitrary CMD, PowerShell, ADB shell, and terminal execution
+- Fixes native prompt-position accounting: prompt tokens were previously counted twice after decode, causing later turns to hit invalid context positions
+- Makes native batched decoding use the live token position after context shifts, preventing stale positions from being sent to llama.cpp
+
+
 ## V0.12.0 — Filtered Android agent
 
 - Adds opt-in Android command control in Settings, disabled by default
