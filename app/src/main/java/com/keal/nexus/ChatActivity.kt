@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arm.aichat.AiChat
 import com.arm.aichat.InferenceEngine
+import com.keal.nexus.agent.NexusPreferences
 import com.keal.nexus.agent.NexusToolCall
 import com.keal.nexus.agent.NexusToolRuntime
 import com.keal.nexus.agent.PhoneControlAgent
@@ -122,6 +123,14 @@ private fun NexusChatApp(initialPath: String?) {
     var generationJob by remember { mutableStateOf<Job?>(null) }
     var showModels by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    val nexusPrefs = remember { NexusPreferences(context) }
+    var memoryItems by remember { mutableStateOf(nexusPrefs.memoryItems()) }
+    var memoryDraft by remember { mutableStateOf("") }
+    var showShortcutManager by remember { mutableStateOf(false) }
+    var shortcutAlias by remember { mutableStateOf("") }
+    var selectedShortcutPackage by remember { mutableStateOf<String?>(null) }
+    var installedApps by remember { mutableStateOf(emptyList<Pair<String, String>>()) }
+    var customShortcuts by remember { mutableStateOf(nexusPrefs.appShortcuts()) }
     var showHistory by remember { mutableStateOf(false) }
     var chatHistory by remember { mutableStateOf(ChatHistoryStore.load(context)) }
     var currentChatId by remember { mutableStateOf(UUID.randomUUID().toString()) }
@@ -1190,6 +1199,57 @@ private fun NexusChatApp(initialPath: String?) {
             }
         }
 
+        if (showShortcutManager) {
+            AlertDialog(
+                onDismissRequest = { showShortcutManager = false },
+                containerColor = surface,
+                title = { Text("Create app shortcut", color = primaryText) },
+                text = {
+                    Column(Modifier.heightIn(max = 440.dp)) {
+                        Text("Give an installed app a name you can say to NEXUS.", color = mutedText, fontSize = 13.sp)
+                        Spacer(Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = shortcutAlias,
+                            onValueChange = { shortcutAlias = it.take(40) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            label = { Text("Your shortcut name") },
+                            placeholder = { Text("e.g. map, work, mail") }
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Text("Choose installed app", color = primaryText, fontWeight = FontWeight.SemiBold)
+                        LazyColumn(Modifier.weight(1f)) {
+                            items(installedApps) { app ->
+                                Row(
+                                    Modifier.fillMaxWidth().clickable { selectedShortcutPackage = app.second }
+                                        .background(if (selectedShortcutPackage == app.second) NexusPurple.copy(alpha = 0.14f) else Color.Transparent)
+                                        .padding(vertical = 10.dp, horizontal = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(selected = selectedShortcutPackage == app.second, onClick = { selectedShortcutPackage = app.second })
+                                    Column(Modifier.weight(1f)) {
+                                        Text(app.first, color = primaryText, fontSize = 14.sp)
+                                        Text(app.second, color = mutedText, fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = shortcutAlias.isNotBlank() && selectedShortcutPackage != null,
+                        onClick = {
+                            nexusPrefs.saveAppShortcut(shortcutAlias, selectedShortcutPackage!!)
+                            customShortcuts = nexusPrefs.appShortcuts()
+                            showShortcutManager = false
+                        }
+                    ) { Text("Save shortcut") }
+                },
+                dismissButton = { TextButton(onClick = { showShortcutManager = false }) { Text("Cancel") } }
+            )
+        }
+
         if (showSettings) {
             ModalBottomSheet(
                 onDismissRequest = { showSettings = false },
@@ -1197,9 +1257,74 @@ private fun NexusChatApp(initialPath: String?) {
                 contentColor = primaryText,
                 dragHandle = { BottomSheetHandle(border) }
             ) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp).padding(bottom = 30.dp)) {
+                Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp).padding(bottom = 30.dp)) {
                     Text("Settings", color = primaryText, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(18.dp))
+                    Text("AI memory", color = primaryText, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Save important facts NEXUS can use in future conversations. Stored only on this phone.", color = mutedText, fontSize = 13.sp, lineHeight = 18.sp)
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = memoryDraft,
+                        onValueChange = { memoryDraft = it.take(500) },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("e.g. I prefer concise answers.", color = mutedText) },
+                        minLines = 2,
+                        maxLines = 3
+                    )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(
+                            enabled = memoryDraft.isNotBlank(),
+                            onClick = {
+                                nexusPrefs.addMemoryItem(memoryDraft)
+                                memoryItems = nexusPrefs.memoryItems()
+                                memoryDraft = ""
+                            }
+                        ) { Text("Save memory") }
+                    }
+                    if (memoryItems.isEmpty()) {
+                        Text("No saved memories yet.", color = mutedText, fontSize = 13.sp)
+                    } else {
+                        memoryItems.forEachIndexed { index, item ->
+                            Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(item, Modifier.weight(1f), color = primaryText, fontSize = 13.sp, lineHeight = 18.sp)
+                                TextButton(onClick = {
+                                    nexusPrefs.removeMemoryItem(index)
+                                    memoryItems = nexusPrefs.memoryItems()
+                                }) { Text("Delete", color = mutedText) }
+                            }
+                        }
+                    }
+                    HorizontalDivider(color = border)
+                    Row(
+                        Modifier.fillMaxWidth().clickable {
+                            val launchIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+                            installedApps = context.packageManager.queryIntentActivities(launchIntent, 0)
+                                .map { it.loadLabel(context.packageManager).toString() to it.activityInfo.packageName }
+                                .distinctBy { it.second }
+                                .sortedBy { it.first.lowercase() }
+                            customShortcuts = nexusPrefs.appShortcuts()
+                            shortcutAlias = ""
+                            selectedShortcutPackage = null
+                            showShortcutManager = true
+                        }.padding(vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("App shortcuts", color = primaryText, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Create your own names for any installed app", color = mutedText, fontSize = 13.sp)
+                        }
+                        Text("Manage  ›", color = NexusPurple, fontSize = 14.sp)
+                    }
+                    customShortcuts.forEach { shortcut ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text("${shortcut.label} → ${shortcut.packageName}", Modifier.weight(1f), color = mutedText, fontSize = 12.sp)
+                            TextButton(onClick = {
+                                nexusPrefs.removeAppShortcut(shortcut.packageName)
+                                customShortcuts = nexusPrefs.appShortcuts()
+                            }) { Text("Remove") }
+                        }
+                    }
+                    HorizontalDivider(color = border)
                     HorizontalDivider(color = border)
                     Row(Modifier.fillMaxWidth().padding(vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
