@@ -760,7 +760,10 @@ private fun NexusChatApp(initialPath: String?) {
                                                                     return@repeat
                                                                 }
                                                             }
-                                                            screen = refreshed ?: NexusAccessibilityService.screenSnapshot()
+                                                            screen = refreshed
+                                                            if (screen.isNullOrBlank()) {
+                                                                finalResult = "I opened the app but could not verify its screen through Accessibility. Please bring the app to the foreground and try again."
+                                                            }
                                                         } else {
                                                             delay(900)
                                                             screen = NexusAccessibilityService.screenSnapshot()
@@ -1212,7 +1215,7 @@ private fun NexusChatApp(initialPath: String?) {
                     Row(Modifier.fillMaxWidth().padding(vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("Android command control", color = primaryText, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Let NEXUS open approved apps, search YouTube, navigate, scroll and control the flashlight. No shell or root access.", color = mutedText, fontSize = 13.sp, lineHeight = 18.sp)
+                            Text("Let NEXUS inspect visible app controls and perform bounded multi-step actions, open approved apps, search YouTube, navigate, scroll and control the flashlight. No shell or root access.", color = mutedText, fontSize = 13.sp, lineHeight = 18.sp)
                         }
                         Switch(checked = androidControlEnabled, onCheckedChange = {
                             androidControlEnabled = it
