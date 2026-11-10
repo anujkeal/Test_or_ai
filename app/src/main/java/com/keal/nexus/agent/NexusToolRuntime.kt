@@ -23,7 +23,7 @@ class NexusToolRuntime(context: Context) {
             append(toolDescriptions.toString()).append(". ")
             append("When a user asks you to inspect, find, list, or read files, use the appropriate workspace tool instead of claiming you cannot access local files. ")
             append("To invoke a tool, emit exactly one JSON object and no other text in this shape: ")
-            append("{\\"tool\\":\\"workspace.list_files\\",\\"arguments\\":{}}. ")
+            append("{\"tool\":\"workspace.list_files\",\"arguments\":{}}. ")
             append("For other tools, use their exact names and JSON arguments from the schemas. Do not invent tool names or claim a tool succeeded until the app returns its result. ")
             append("Write and delete tools require the user to enable their permissions and then approve each individual action in the app. Never claim approval yourself. ")
             append("If a tool returns an error, explain it honestly and tell the user what permission or setup is needed. After receiving a successful tool result, answer the user's original request clearly. ")
@@ -67,7 +67,7 @@ class NexusToolRuntime(context: Context) {
             val ch = text[i]
             if (inString) {
                 if (escaped) escaped = false
-                else if (ch == '\\\\') escaped = true
+                else if (ch == '\\') escaped = true
                 else if (ch == '"') inString = false
             } else {
                 when (ch) {
