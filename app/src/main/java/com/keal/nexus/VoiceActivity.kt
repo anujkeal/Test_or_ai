@@ -81,6 +81,7 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
     var ttsReady by remember { mutableStateOf(false) }
     var onRecognized by remember { mutableStateOf<(String) -> Unit>({}) }
     var startListeningRequested by remember { mutableStateOf(false) }
+    var pendingTorchCommand by remember { mutableStateOf<String?>(null) }
     var frame by remember { mutableLongStateOf(0L) }
     var pointer by remember { mutableStateOf(Offset.Unspecified) }
 
@@ -113,6 +114,17 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
         caption = "Sending your words to NEXUS"
         scope.launch {
             try {
+                // Flashlight control requires Android's runtime CAMERA permission.
+                val torchCommand = cleanText.lowercase() in listOf(
+                    "turn on flashlight", "turn on the flashlight", "switch on flashlight", "switch on the flashlight",
+                    "enable flashlight", "enable the flashlight", "turn off flashlight", "turn off the flashlight",
+                    "switch off flashlight", "switch off the flashlight", "disable flashlight", "disable the flashlight"
+                )
+                if (torchCommand && ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                    pendingTorchCommand = cleanText
+                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    return@launch
+                }
                 // Deterministic, allow-listed device actions run before asking the local model.
                 val deviceResult = NexusDeviceActions(context.applicationContext).execute(cleanText)
                 if (deviceResult != null) {
@@ -247,6 +259,24 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
             error = "Microphone permission was denied. Allow it in Android app settings to use voice."
             status = "Microphone permission needed"
             caption = error.orEmpty()
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val command = pendingTorchCommand
+        pendingTorchCommand = null
+        if (granted && command != null) {
+            val result = NexusDeviceActions(context.applicationContext).execute(command)
+                ?: "I couldn't complete that device action."
+            response = result
+            caption = result
+            status = "NEXUS action"
+            visualState = if (ttsReady) VoiceVisualState.SPEAKING else VoiceVisualState.IDLE
+            if (ttsReady) tts?.speak(result, TextToSpeech.QUEUE_FLUSH, null, "nexus-device-action")
+        } else if (!granted) {
+            error = "Camera permission is required to control the flashlight. You can allow it in Android app settings."
+            caption = error.orEmpty()
+            status = "Permission needed"
         }
     }
 
