@@ -425,6 +425,10 @@ private fun NexusChatApp(initialPath: String?) {
                             }
                             MenuEntry("◇", "Models") { showMenu = false; showModels = true }
                             MenuEntry("◷", "Chat history") { showMenu = false; showHistory = true }
+                            MenuEntry("◉", "Voice animation") {
+                                showMenu = false
+                                context.startActivity(android.content.Intent(context, VoiceActivity::class.java))
+                            }
                             MenuEntry("☷", "Settings") { showMenu = false; showSettings = true }
                         }
                     }
