@@ -107,6 +107,8 @@ private fun NexusChatApp(initialPath: String?) {
     var showHistory by remember { mutableStateOf(false) }
     var chatHistory by remember { mutableStateOf(ChatHistoryStore.load(context)) }
     var currentChatId by remember { mutableStateOf(UUID.randomUUID().toString()) }
+    var pendingRestoreChat by remember { mutableStateOf<SavedChat?>(null) }
+    var restoringHistory by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var downloadId by remember { mutableStateOf(prefs.getLong("active_download_id", -1L).takeIf { it >= 0L }) }
     var downloadModel by remember { mutableStateOf(ModelCatalog.models.firstOrNull { it.id == prefs.getString("active_download_model_id", null) }) }
@@ -216,11 +218,6 @@ private fun NexusChatApp(initialPath: String?) {
                     local.loadModel(requestedPath)
                     loadStage = "Preparing chat"
                     local.setSystemPrompt(NEXUS_SYSTEM_PROMPT)
-                    // Rebuild recent context only after a fresh native model load.
-                    val priorTurns = messages.filter { it.user }.takeLast(8)
-                    priorTurns.forEach { turn ->
-                        local.sendUserPrompt(turn.text, 512).collect { }
-                    }
                 } else {
                     loadStage = "Reusing loaded model"
                 }
@@ -293,24 +290,36 @@ private fun NexusChatApp(initialPath: String?) {
             messages.addAll(chat.messages.map { ChatMessage(it.user, it.text) })
             currentChatId = chat.id
             input = ""
+            loadError = null
             showHistory = false
-            if (ready && engine != null) {
-                ready = false
-                loading = true
-                try {
-                    engine?.resetConversation(NEXUS_SYSTEM_PROMPT)
-                    chat.messages.filter { it.user }.takeLast(8).forEach { turn ->
-                        engine?.sendUserPrompt(turn.text, 512)?.collect { }
-                    }
-                    ready = true
-                } catch (t: Throwable) {
-                    loadError = t.message ?: "Could not restore this conversation."
-                } finally {
-                    loading = false
-                }
-            } else if (modelPath.isNullOrBlank()) {
-                showModels = true
+            pendingRestoreChat = chat
+            if (modelPath.isNullOrBlank()) showModels = true
+        }
+    }
+
+    // Restore saved turns only after the native model is fully ready. This also
+    // handles a history item selected while the model is still loading.
+    LaunchedEffect(pendingRestoreChat, engine, loadAttempt) {
+        val chat = pendingRestoreChat ?: return@LaunchedEffect
+        val activeEngine = engine ?: return@LaunchedEffect
+        snapshotFlow { ready }.first { it }
+        restoringHistory = true
+        ready = false
+        loading = true
+        loadError = null
+        try {
+            activeEngine.resetConversation(NEXUS_SYSTEM_PROMPT)
+            chat.messages.filter { it.user }.takeLast(8).forEach { turn ->
+                activeEngine.sendUserPrompt(turn.text, 512).collect { }
             }
+            pendingRestoreChat = null
+            ready = true
+        } catch (t: Throwable) {
+            loadError = t.message ?: "Could not restore this conversation. Select Try again to retry."
+            ready = false
+        } finally {
+            restoringHistory = false
+            loading = false
         }
     }
 
@@ -518,7 +527,7 @@ private fun NexusChatApp(initialPath: String?) {
                         value = input,
                         onValueChange = { input = it },
                         modifier = Modifier.weight(1f),
-                        enabled = ready && !generating,
+                        enabled = ready && !generating && !restoringHistory,
                         placeholder = { Text(if (ready) "Message NEXUS" else "Choose a model to start", color = mutedText, fontSize = 16.sp) },
                         maxLines = 5,
                         shape = CircleShape,
