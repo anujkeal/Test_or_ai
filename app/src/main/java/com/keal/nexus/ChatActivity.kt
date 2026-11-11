@@ -111,18 +111,18 @@ private data class PendingToolApproval(
 private data class ContactResult(val name: String, val number: String)
 private data class ChatMessage(val user: Boolean, val text: String, val contacts: List<ContactResult> = emptyList())
 
-private val NexusDark = Color(0xFF0D1016)
-private val NexusDarkSurface = Color(0xFF181D27)
-private val NexusDarkBorder = Color(0xFF272E3B)
-private val NexusLight = Color(0xFFF7F8FA)
+private val NexusDark = Color(0xFF0E0B1C)
+private val NexusDarkSurface = Color(0xFF181430)
+private val NexusDarkBorder = Color(0xFF2A2548)
+private val NexusLight = Color(0xFFF6F5FC)
 private val NexusLightSurface = Color(0xFFFFFFFF)
-private val NexusLightBorder = Color(0xFFE4E7EC)
-private val NexusPurple = Color(0xFF6945F5)
-private val NexusMint = Color(0xFF35CFA5)
-private val NexusTextDark = Color(0xFFF1F3F8)
-private val NexusMutedDark = Color(0xFF8992A4)
-private val NexusTextLight = Color(0xFF171B24)
-private val NexusMutedLight = Color(0xFF707887)
+private val NexusLightBorder = Color(0xFFE8E5F6)
+private val NexusPurple = Color(0xFF8B6CFF)
+private val NexusMint = Color(0xFF8B6CFF)
+private val NexusTextDark = Color(0xFFF1EEFF)
+private val NexusMutedDark = Color(0xFF9892BC)
+private val NexusTextLight = Color(0xFF15122B)
+private val NexusMutedLight = Color(0xFF78749A)
 
 private enum class NexusThemeMode { SYSTEM, LIGHT, DARK }
 
@@ -262,7 +262,7 @@ private fun NexusChatApp(initialPath: String?) {
     val border = if (isDark) NexusDarkBorder else NexusLightBorder
     val primaryText = if (isDark) NexusTextDark else NexusTextLight
     val mutedText = if (isDark) NexusMutedDark else NexusMutedLight
-    val userBubble = if (isDark) Color(0xFF242A36) else Color(0xFFECEFFD)
+    val userBubble = if (isDark) Color(0xFF2A2548) else Color(0xFFECEFFD)
 
     SideEffect {
         (context as? ComponentActivity)?.window?.let { window ->
@@ -732,7 +732,7 @@ private fun NexusChatApp(initialPath: String?) {
                             }
                             if (loadError != null) {
                                 Spacer(Modifier.height(18.dp))
-                                Surface(color = if (isDark) Color(0xFF3B2027) else Color(0xFFFFE9EA), shape = RoundedCornerShape(8.dp)) {
+                                Surface(color = if (isDark) Color(0xFF3B2027) else Color(0xFFFFE9EA), shape = RoundedCornerShape(22.dp)) {
                                     Column(Modifier.padding(16.dp)) {
                                         Text("Couldn't load model", color = Color(0xFFE36B79), fontWeight = FontWeight.Bold)
                                         Spacer(Modifier.height(6.dp))
@@ -1358,7 +1358,7 @@ private fun NexusChatApp(initialPath: String?) {
                                     },
                                     enabled = downloadId == null,
                                     shape = RoundedCornerShape(18.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = NexusMint, contentColor = Color(0xFF07110E))
+                                    colors = ButtonDefaults.buttonColors(containerColor = NexusMint, contentColor = Color(0xFF15122B))
                                 ) { Text(if (downloadModel?.id == model.id && downloadId != null) "Getting…" else "↓  Get", fontWeight = FontWeight.Bold) }
                             }
                         }
@@ -1775,7 +1775,7 @@ private fun NexusChatApp(initialPath: String?) {
                         Text("Theme", color = primaryText, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.weight(1f))
                         Row(
-                            Modifier.clip(CircleShape).background(if (isDark) Color(0xFF252B37) else Color(0xFFEEF0F4)).padding(4.dp)
+                            Modifier.clip(CircleShape).background(if (isDark) Color(0xFF241F43) else Color(0xFF241F43)).padding(4.dp)
                         ) {
                             listOf(NexusThemeMode.SYSTEM, NexusThemeMode.LIGHT, NexusThemeMode.DARK).forEach { mode ->
                                 val selected = themeMode == mode
@@ -1784,11 +1784,11 @@ private fun NexusChatApp(initialPath: String?) {
                                         themeMode = mode
                                         prefs.edit().putString("theme", mode.name).apply()
                                     },
-                                    color = if (selected) (if (isDark) Color(0xFF151A23) else Color.White) else Color.Transparent,
+                                    color = if (selected) (if (isDark) Color(0xFF211B3C) else Color.White) else Color.Transparent,
                                     shape = CircleShape
                                 ) {
                                     Text(
-                                        when (mode) { NexusThemeMode.SYSTEM -> "System"; NexusThemeMode.LIGHT -> "Light"; NexusThemeMode.DARK -> "Dark" },
+                                        when (mode) { NexusThemeMode.SYSTEM -> "Auto"; NexusThemeMode.LIGHT -> "Light"; NexusThemeMode.DARK -> "Dark" },
                                         Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                                         color = if (selected) primaryText else mutedText, fontSize = 13.sp,
                                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
@@ -1808,7 +1808,7 @@ private fun NexusChatApp(initialPath: String?) {
                     ) {
                         Text("▤", color = mutedText, fontSize = 22.sp)
                         Spacer(Modifier.width(18.dp))
-                        Text("Clear all chats", color = primaryText, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Clear all chats", color = Color(0xFFC4472F), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                     }
                     HorizontalDivider(color = border)
                     Spacer(Modifier.height(18.dp))
@@ -1929,7 +1929,7 @@ private fun MenuEntry(symbol: String, label: String, action: () -> Unit) {
     DropdownMenuItem(
         text = { Text(label, fontSize = 16.sp) },
         onClick = action,
-        leadingIcon = { Text(symbol, fontSize = 21.sp, color = Color(0xFF8992A4)) },
+        leadingIcon = { Text(symbol, fontSize = 21.sp, color = Color(0xFF9892BC)) },
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 7.dp)
     )
 }
