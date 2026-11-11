@@ -818,7 +818,11 @@ private fun NexusChatApp(initialPath: String?) {
                     )
                     Surface(
                         onClick = {
-                            val prompt = input.trim()
+                            val typedPrompt = input.trim()
+                            val retryWords = setOf("retry", "try again", "retry it", "do it again", "continue")
+                            val prompt = if (pendingWorkspaceRetryPrompt != null && typedPrompt.lowercase() in retryWords) {
+                                pendingWorkspaceRetryPrompt.orEmpty()
+                            } else typedPrompt
                             if (generating) {
                                 generationJob?.cancel()
                             } else if (prompt.isNotEmpty() && ready) {
@@ -1055,9 +1059,11 @@ private fun NexusChatApp(initialPath: String?) {
                                                                     toolRuntime.execute(writeCall, userApproved = true)
                                                                 }
                                                                 if (saved.startsWith("Tool result: Saved ") && codeRunner.configured) {
+                                                                     pendingWorkspaceRetryPrompt = null
                                                                     val source = withContext(Dispatchers.IO) { toolRuntime.readSourceForExecution(fileName) }
                                                                     saved + "\n\n" + codeRunner.run(fileName, source).display(fileName)
                                                                 } else if (saved.startsWith("Tool result: Saved ")) {
+                                                                     pendingWorkspaceRetryPrompt = null
                                                                     saved + "\n\nTo see the program output, configure a Piston-compatible server in Settings → Code execution, then say: run $fileName"
                                                                 } else saved
                                                             } else "File creation cancelled. No file was written."
