@@ -1424,7 +1424,6 @@ private fun NexusChatApp(initialPath: String?) {
                             if (file.absolutePath == modelPath) Text("✓", color = NexusMint, fontSize = 24.sp)
                         }
                     }
-                    }
                 }
             }
         }
