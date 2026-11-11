@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -118,6 +119,8 @@ private val NexusLight = Color(0xFFF6F5FC)
 private val NexusLightSurface = Color(0xFFFFFFFF)
 private val NexusLightBorder = Color(0xFFE8E5F6)
 private val NexusPurple = Color(0xFF8B6CFF)
+private val NexusGradientStart = Color(0xFF2A4DF5)
+private val NexusGradientEnd = Color(0xFF9B3CF8)
 private val NexusMint = Color(0xFF8B6CFF)
 private val NexusTextDark = Color(0xFFF1EEFF)
 private val NexusMutedDark = Color(0xFF9892BC)
@@ -262,7 +265,7 @@ private fun NexusChatApp(initialPath: String?) {
     val border = if (isDark) NexusDarkBorder else NexusLightBorder
     val primaryText = if (isDark) NexusTextDark else NexusTextLight
     val mutedText = if (isDark) NexusMutedDark else NexusMutedLight
-    val userBubble = if (isDark) Color(0xFF2A2548) else Color(0xFFECEFFD)
+    val userBubble = Color.Transparent
 
     SideEffect {
         (context as? ComponentActivity)?.window?.let { window ->
@@ -689,7 +692,7 @@ private fun NexusChatApp(initialPath: String?) {
                             Spacer(Modifier.height(10.dp))
                             Column(
                                 Modifier.fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
+                                    .clip(RoundedCornerShape(24.dp))
                                     .background(surface)
                             ) {
                                 Column(
@@ -756,13 +759,17 @@ private fun NexusChatApp(initialPath: String?) {
                             itemsIndexed(messages) { _, message ->
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = if (message.user) Arrangement.End else Arrangement.Start) {
                                     Surface(
-                                        color = if (message.user) userBubble else Color.Transparent,
-                                        shape = RoundedCornerShape(if (message.user) 18.dp else 0.dp),
+                                        color = userBubble,
+                                        shape = RoundedCornerShape(if (message.user) 22.dp else 0.dp),
                                         modifier = Modifier.widthIn(max = 340.dp)
                                     ) {
-                                        Column(Modifier.padding(horizontal = if (message.user) 16.dp else 0.dp, vertical = if (message.user) 12.dp else 2.dp)) {
+                                        Column(
+                                            Modifier
+                                                .then(if (message.user) Modifier.background(Brush.horizontalGradient(listOf(NexusGradientStart, NexusGradientEnd)), RoundedCornerShape(22.dp)) else Modifier)
+                                                .padding(horizontal = if (message.user) 16.dp else 0.dp, vertical = if (message.user) 12.dp else 2.dp)
+                                        ) {
                                             if (message.text.isNotBlank()) {
-                                                Text(message.text, color = primaryText, fontSize = 16.sp, lineHeight = 24.sp)
+                                                Text(message.text, color = if (message.user) Color.White else primaryText, fontSize = 16.sp, lineHeight = 24.sp)
                                                 if (!message.user && pendingWorkspaceRetryPrompt != null && messages.lastOrNull() === message) {
                                                     Spacer(Modifier.height(10.dp))
                                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1274,11 +1281,11 @@ private fun NexusChatApp(initialPath: String?) {
                                 }
                             }
                         },
-                        color = if (ready && input.isNotBlank() && !generating) NexusPurple else surface,
+                        color = Color.Transparent,
                         shape = CircleShape,
                         modifier = Modifier.size(58.dp)
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
+                        Box(Modifier.fillMaxSize().then(if (ready && input.isNotBlank() && !generating) Modifier.background(Brush.horizontalGradient(listOf(NexusGradientStart, NexusGradientEnd)), CircleShape) else Modifier), contentAlignment = Alignment.Center) {
                             Text(if (generating) "×" else "↑", color = if (generating) Color(0xFFE36B79) else if (ready && input.isNotBlank()) Color.White else mutedText, fontSize = 28.sp, fontWeight = FontWeight.Medium)
                         }
                     }
