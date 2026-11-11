@@ -189,6 +189,7 @@ private fun NexusChatApp(initialPath: String?) {
     var documents by remember { mutableStateOf(documentStore.list()) }
     var activeDocument by remember { mutableStateOf<NexusDocument?>(null) }
     var showDocumentLibrary by remember { mutableStateOf(false) }
+    var expandedDocumentId by remember { mutableStateOf<String?>(null) }
     var importingDocument by remember { mutableStateOf(false) }
     var documentStatus by remember { mutableStateOf("") }
 
@@ -1446,10 +1447,15 @@ private fun NexusChatApp(initialPath: String?) {
                                     }) { Text("Ask Llama") }
                                 }
                                 Text(
-                                    doc.text.take(420).let { if (doc.text.length > 420) it + "…" else it },
-                                    color = mutedText, fontSize = 12.sp, lineHeight = 17.sp, maxLines = 5
+                                    if (expandedDocumentId == doc.id) doc.text
+                                    else doc.text.take(420).let { if (doc.text.length > 420) it + "…" else it },
+                                    color = mutedText, fontSize = 12.sp, lineHeight = 17.sp,
+                                    maxLines = if (expandedDocumentId == doc.id) Int.MAX_VALUE else 5
                                 )
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    TextButton(onClick = {
+                                        expandedDocumentId = if (expandedDocumentId == doc.id) null else doc.id
+                                    }) { Text(if (expandedDocumentId == doc.id) "Show less" else "Read full text") }
                                     TextButton(onClick = { activeDocument = doc; documentStatus = "Attached ${doc.name}. Ask a question in chat." }) {
                                         Text(if (activeDocument?.id == doc.id) "Attached" else "Use in chat")
                                     }
