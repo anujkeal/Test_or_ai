@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arm.aichat.AiChat
 import com.arm.aichat.InferenceEngine
+import com.keal.nexus.agent.NexusCodeRunner
 import com.keal.nexus.agent.NexusRemoteApi
 import com.keal.nexus.agent.NexusPreferences
 import com.keal.nexus.agent.NexusToolCall
@@ -140,6 +141,11 @@ private fun NexusChatApp(initialPath: String?) {
     val scope = rememberCoroutineScope()
     val toolRuntime = remember { NexusToolRuntime(context) }
     val remoteApi = remember { NexusRemoteApi(context) }
+    val codeRunner = remember { NexusCodeRunner(context) }
+    var runnerEndpoint by remember { mutableStateOf(codeRunner.endpoint) }
+    var runnerToken by remember { mutableStateOf(codeRunner.token) }
+    var runnerStatus by remember { mutableStateOf("") }
+    var runnerConfigured by remember { mutableStateOf(codeRunner.configured) }
     var apiEnabled by remember { mutableStateOf(remoteApi.enabled) }
     var apiEndpoint by remember { mutableStateOf(remoteApi.endpoint) }
     var apiModel by remember { mutableStateOf(remoteApi.model) }
@@ -273,8 +279,8 @@ private fun NexusChatApp(initialPath: String?) {
         }
     }
 
-    LaunchedEffect(modelPath, loadAttempt, apiEnabled) {
-        if (apiEnabled) {
+    LaunchedEffect(modelPath, loadAttempt, apiEnabled, runnerConfigured) {
+        if (apiEnabled || runnerConfigured) {
             ready = true
             loading = false
             loadError = null
@@ -751,7 +757,18 @@ private fun NexusChatApp(initialPath: String?) {
                                             messages[messages.lastIndex] = ChatMessage(false, answer)
                                             return@launch
                                         }
-                                        val activeEngine = engine ?: error("The local inference engine is unavailable.")
+                                        val runFile = toolRuntime.detectRunFile(prompt)
+                                        if (runFile != null) {
+                                            val runResult = if (!codeRunner.configured) {
+                                                "Code runner is not configured. Open Settings → Code execution and add your own Piston-compatible HTTPS server."
+                                            } else {
+                                                val source = withContext(Dispatchers.IO) { toolRuntime.readSourceForExecution(runFile) }
+                                                codeRunner.run(runFile, source).display(runFile)
+                                            }
+                                            messages[messages.lastIndex] = ChatMessage(false, runResult)
+                                            return@launch
+                                        }
+                                        val activeEngine = engine ?: error("The local inference engine is unavailable. For code execution, say 'run main.py' after configuring a code runner.")
                                         // Explicit device requests are handled by Android, not by model-generated claims.
                                         val callMatch = Regex("^(?:please\\s+)?(?:call|dial|phone)\\s+(?:my\\s+)?(.+)$", RegexOption.IGNORE_CASE).matchEntire(prompt)
                                         val deviceActions = NexusDeviceActions(context.applicationContext)
@@ -1397,6 +1414,46 @@ private fun NexusChatApp(initialPath: String?) {
                         }) { Text("Save API") }
                     }
                     if (apiStatus.isNotBlank()) Text(apiStatus, color = mutedText, fontSize = 12.sp)
+                    HorizontalDivider(color = border)
+                    Spacer(Modifier.height(14.dp))
+                    Text("Code execution", color = primaryText, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Run saved source files in an isolated Piston-compatible server. Your code is sent to that server; it does not run on this phone.", color = mutedText, fontSize = 13.sp)
+                    OutlinedTextField(
+                        value = runnerEndpoint,
+                        onValueChange = { runnerEndpoint = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Execution server base URL") },
+                        placeholder = { Text("https://your-server.example") }
+                    )
+                    OutlinedTextField(
+                        value = runnerToken,
+                        onValueChange = { runnerToken = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        label = { Text("Execution API token (if required)") }
+                    )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = {
+                            codeRunner.endpoint = ""
+                            codeRunner.token = ""
+                            runnerEndpoint = ""
+                            runnerToken = ""
+                            runnerConfigured = false
+                            runnerStatus = "Execution server settings cleared."
+                        }) { Text("Clear") }
+                        TextButton(onClick = {
+                            runCatching {
+                                codeRunner.endpoint = runnerEndpoint
+                                codeRunner.token = runnerToken
+                                require(runnerEndpoint.startsWith("https://")) { "Use an HTTPS server URL." }
+                                runnerConfigured = codeRunner.configured
+                                runnerStatus = "Execution server saved. Select a workspace file, then say: run main.py"
+                            }.onFailure { runnerStatus = "Could not save runner: \${it.message}" }
+                        }) { Text("Save runner") }
+                    }
+                    if (runnerStatus.isNotBlank()) Text(runnerStatus, color = mutedText, fontSize = 12.sp)
                     HorizontalDivider(color = border)
                     Spacer(Modifier.height(12.dp))
                     Text("AI memory", color = primaryText, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
