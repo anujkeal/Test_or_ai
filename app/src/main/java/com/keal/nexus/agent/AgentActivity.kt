@@ -60,19 +60,19 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 // ── Design tokens (mirror main palette) ──────────────────────────────────────
-private val Ink      = Color(0xFF090D12)
-private val Surface0 = Color(0xFF0F1620)
-private val Surface1 = Color(0xFF161F2B)
-private val Surface2 = Color(0xFF1E2A38)
-private val Mint     = Color(0xFF6EE7B7)
-private val Accent   = Color(0xFF818CF8)
-private val Muted    = Color(0xFF64748B)
-private val MutedLight= Color(0xFF94A3B8)
-private val MainText = Color(0xFFE2E8F0)
-private val Success  = Color(0xFF34D399)
-private val Danger   = Color(0xFFF87171)
-private val Warning  = Color(0xFFFBBF24)
-private val Border   = Color(0xFF1E2D3D)
+private val Ink      = Color(0xFF0E0B1C)
+private val Surface0 = Color(0xFF181430)
+private val Surface1 = Color(0xFF181430)
+private val Surface2 = Color(0xFF2A2548)
+private val Mint     = Color(0xFF8B6CFF)
+private val Accent   = Color(0xFF8B6CFF)
+private val Muted    = Color(0xFF9892BC)
+private val MutedLight= Color(0xFF9892BC)
+private val MainText = Color(0xFFF1EEFF)
+private val Success  = Color(0xFF8B6CFF)
+private val Danger   = Color(0xFFC4472F)
+private val Warning  = Color(0xFF9B3CF8)
+private val Border   = Color(0xFF2A2548)
 
 class AgentActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
