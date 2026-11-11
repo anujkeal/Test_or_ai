@@ -41,12 +41,12 @@ class NexusPreferences(context: Context) {
         val text = prompt.trim()
         if (text.isBlank()) return null
         val explicitlyAsked = Regex(
-            """(?i)\\b(save this|remember this|remember that|save that|remember it|don't forget)\\b"""
+            """(?i)\b(save this|remember this|remember that|save that|remember it|don't forget)\b"""
         ).containsMatchIn(text)
         if (!explicitlyAsked) return null
 
         val nameMatch = Regex(
-            """(?i)\\bmy name is\\s+([\\p{L}][\\p{L} .'-]{0,50}?)(?=\\s+(?:and\\s+)?(?:save|remember|don't forget)\\b|[.!?,;]|$)"""
+            """(?i)\bmy name is\s+([\p{L}][\p{L} .'-]{0,50}?)(?=\s+(?:and\s+)?(?:save|remember|don't forget)\b|[.!?,;]|$)"""
         ).find(text)
         val fact = nameMatch?.groupValues?.get(1)?.trim()?.trimEnd('.', ',', ';')
         if (!fact.isNullOrBlank()) {
@@ -57,7 +57,7 @@ class NexusPreferences(context: Context) {
         }
 
         val rememberMatch = Regex(
-            """(?i)\\b(?:remember that|save this|remember this|save that|don't forget)\\s*[:,-]?\\s*(.{3,300})$"""
+            """(?i)\b(?:remember that|save this|remember this|save that|don't forget)\s*[:,-]?\s*(.{3,300})$"""
         ).find(text)
         val genericFact = rememberMatch?.groupValues?.get(1)?.trim()?.trimEnd('.', '!', '?')
         if (!genericFact.isNullOrBlank()) {
