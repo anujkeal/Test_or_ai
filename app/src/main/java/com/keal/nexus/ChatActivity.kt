@@ -1685,7 +1685,6 @@ private fun NexusChatApp(initialPath: String?) {
             }
 
         }
-        }
         if (startupLoading) {
             Box(
                 Modifier.fillMaxSize()
