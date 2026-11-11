@@ -31,6 +31,50 @@ class NexusPreferences(context: Context) {
 
     data class AppShortcut(val label: String, val packageName: String)
 
+    var automaticMemoryEnabled: Boolean
+        get() = store.getBoolean("automatic_memory_enabled", true)
+        set(value) { store.edit().putBoolean("automatic_memory_enabled", value).apply() }
+
+    /**
+     * Stores only low-risk first-person preferences, learning goals and project facts.
+     * Sensitive categories and credentials are deliberately excluded.
+     */
+    fun learnSafeMemoryFromPrompt(prompt: String): String? {
+        if (!automaticMemoryEnabled) return null
+        val text = prompt.trim().replace(Regex("""\s+"""), " ")
+        if (text.length !in 12..320) return null
+        val lower = text.lowercase()
+        val sensitive = listOf(
+            "password", "passcode", "otp", "one-time code", "token", "api key",
+            "bank account", "card number", "aadhaar", "pan number", "passport",
+            "medical", "diagnosis", "medication", "disease", "religion", "caste",
+            "political party", "sexual", "relationship status", "trauma"
+        )
+        if (sensitive.any { lower.contains(it) }) return null
+        val patterns = listOf(
+            Regex("""(?i)^(?:my name is)\s+([\p{L}][\p{L} .'-]{0,50})[.!]?$"""),
+            Regex("""(?i)^(?:i prefer|i like|i dislike|i don't like|i usually prefer)\s+(.{4,220})[.!]?$"""),
+            Regex("""(?i)^(?:i am learning|i'm learning|i study|i am studying)\s+(.{3,180})[.!]?$"""),
+            Regex("""(?i)^(?:i am building|i'm building|i am working on|i'm working on|my current project is)\s+(.{3,200})[.!]?$"""),
+            Regex("""(?i)^(?:my goal is|i want to achieve|i am aiming for|i'm aiming for)\s+(.{3,180})[.!]?$""")
+        )
+        val match = patterns.firstNotNullOfOrNull { it.find(text) } ?: return null
+        val category = when {
+            patterns[0].matches(text) -> "Identity"
+            patterns[1].matches(text) -> "Preference"
+            patterns[2].matches(text) -> "Learning"
+            patterns[3].matches(text) -> "Project"
+            else -> "Goal"
+        }
+        val detail = match.groupValues[1].trim().trimEnd('.', '!')
+        if (detail.isBlank() || detail.length < 3) return null
+        val item = if (category == "Identity") "The user's name is $detail." else "$category: $detail"
+        val existing = memoryItems()
+        if (existing.any { it.equals(item, true) }) return null
+        addMemoryItem(item)
+        return item
+    }
+
     fun memoryItems(): List<String> = runCatching {
         val json = org.json.JSONArray(store.getString("ai_memory_items", "[]"))
         (0 until json.length()).mapNotNull { json.optString(it).trim().takeIf(String::isNotBlank) }
@@ -116,7 +160,7 @@ class NexusPreferences(context: Context) {
         val q = question.trim().lowercase()
         if (!Regex("""\b(what(?:'s| is) my name|do you know my name|who am i|tell me my name)\b""").containsMatchIn(q)) return null
         val candidates = memoryItems().mapNotNull { entry ->
-            val match = Regex("""(?i)\b(?:my name is|i am called|call me|name:)\s+([\p{L}][\p{L} .'-]{0,60})""").find(entry)
+            val match = Regex("""(?i)\b(?:my name is|i am called|call me|name:|the user's name is)\s+([\p{L}][\p{L} .'-]{0,60})""").find(entry)
             match?.groupValues?.get(1)?.trim()?.trimEnd('.')?.takeIf { it.isNotBlank() }
         }
         return candidates.lastOrNull()?.let { "Your name is $it, according to your saved NEXUS memory." }

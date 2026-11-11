@@ -177,6 +177,7 @@ private fun NexusChatApp(initialPath: String?) {
     val nexusPrefs = remember { NexusPreferences(context) }
     var memoryItems by remember { mutableStateOf(nexusPrefs.memoryItems()) }
     var memoryDraft by remember { mutableStateOf("") }
+    var automaticMemoryEnabled by remember { mutableStateOf(nexusPrefs.automaticMemoryEnabled) }
     var showShortcutManager by remember { mutableStateOf(false) }
     var shortcutAlias by remember { mutableStateOf("") }
     var selectedShortcutPackage by remember { mutableStateOf<String?>(null) }
@@ -848,6 +849,8 @@ private fun NexusChatApp(initialPath: String?) {
                                             messages[messages.lastIndex] = ChatMessage(false, savedMessage)
                                             return@launch
                                         }
+                                        val learnedMemory = nexusPrefs.learnSafeMemoryFromPrompt(prompt)
+                                        if (learnedMemory != null) memoryItems = nexusPrefs.memoryItems()
                                         if (apiEnabled) {
                                             val answer = nexusPrefs.memoryAnswer(prompt)
                                                 ?: remoteApi.reply(prompt, nexusPrefs.memoryPromptSection())
@@ -1561,6 +1564,19 @@ private fun NexusChatApp(initialPath: String?) {
                     Spacer(Modifier.height(12.dp))
                     Text("AI memory", color = primaryText, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     Text("Save important facts NEXUS can use in future conversations. Stored only on this phone.", color = mutedText, fontSize = 13.sp, lineHeight = 18.sp)
+                    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Automatic safe memory", color = primaryText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Text("Learn preferences, learning topics, projects and goals from clear statements. Sensitive categories are excluded.", color = mutedText, fontSize = 12.sp, lineHeight = 17.sp)
+                        }
+                        Switch(
+                            checked = automaticMemoryEnabled,
+                            onCheckedChange = { enabled ->
+                                nexusPrefs.automaticMemoryEnabled = enabled
+                                automaticMemoryEnabled = enabled
+                            }
+                        )
+                    }
                     Spacer(Modifier.height(10.dp))
                     OutlinedTextField(
                         value = memoryDraft,
