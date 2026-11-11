@@ -1,5 +1,6 @@
 package com.keal.nexus
 
+import android.Manifest
 import android.app.ActivityManager
 import android.app.DownloadManager
 import android.content.Context
@@ -62,12 +63,44 @@ import java.io.File
 import java.io.IOException
 import java.util.UUID
 
+private fun searchContacts(context: Context, query: String): List<ContactResult> {
+    val results = linkedMapOf<String, ContactResult>()
+    val projection = arrayOf(
+        ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+        ContactsContract.CommonDataKinds.Phone.NUMBER
+    )
+    val selection = "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ?"
+    val args = arrayOf("%$query%")
+    runCatching {
+        context.contentResolver.query(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            projection,
+            selection,
+            args,
+            ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME + " COLLATE NOCASE ASC"
+        )?.use { cursor ->
+            val nameIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+            val numberIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+            while (cursor.moveToNext()) {
+                val name = if (nameIndex >= 0) cursor.getString(nameIndex).orEmpty() else ""
+                val number = if (numberIndex >= 0) cursor.getString(numberIndex).orEmpty() else ""
+                if (name.isNotBlank() && number.isNotBlank()) {
+                    val key = number.filter { it.isDigit() || it == '+' }
+                    if (key.isNotBlank()) results.putIfAbsent(key, ContactResult(name, number))
+                }
+            }
+        }
+    }
+    return results.values.toList().take(30)
+}
+
 private data class PendingToolApproval(
     val call: NexusToolCall,
     val decision: CompletableDeferred<Boolean>
 )
 
-private data class ChatMessage(val user: Boolean, val text: String)
+private data class ContactResult(val name: String, val number: String)
+private data class ChatMessage(val user: Boolean, val text: String, val contacts: List<ContactResult> = emptyList())
 
 private val NexusDark = Color(0xFF0D1016)
 private val NexusDarkSurface = Color(0xFF181D27)
@@ -137,6 +170,29 @@ private fun NexusChatApp(initialPath: String?) {
     var restoringHistory by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var pendingToolApproval by remember { mutableStateOf<PendingToolApproval?>(null) }
+    var pendingCallNumber by remember { mutableStateOf<String?>(null) }
+    val callPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val number = pendingCallNumber
+        pendingCallNumber = null
+        if (granted && !number.isNullOrBlank()) {
+            runCatching { context.startActivity(Intent(Intent.ACTION_CALL, Uri.fromParts("tel", number, null))) }
+                .onFailure { messages.add(ChatMessage(false, "Couldn't start the call: ${it.message ?: "phone permission or dialer unavailable"}.")) }
+        } else if (!granted) {
+            messages.add(ChatMessage(false, "Calling permission was not granted. You can still copy the number or enable Phone permission in Android settings."))
+        }
+    }
+    val contactsPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val queryName = pendingContactQuery
+        pendingContactQuery = null
+        if (granted && !queryName.isNullOrBlank()) {
+            val found = searchContacts(context, queryName)
+            val reply = if (found.isEmpty()) "I couldn't find any contacts matching '$queryName'." else "Found ${found.size} matching contact${if (found.size == 1) "" else "s"}. Choose who you want to call:"
+            messages.add(ChatMessage(false, reply, found))
+        } else if (!granted) {
+            messages.add(ChatMessage(false, "NEXUS needs Contacts permission to find matching contacts. No contact data was read."))
+        }
+    }
+    var pendingContactQuery by remember { mutableStateOf<String?>(null) }
     var downloadId by remember { mutableStateOf(prefs.getLong("active_download_id", -1L).takeIf { it >= 0L }) }
     var downloadModel by remember { mutableStateOf(ModelCatalog.models.firstOrNull { it.id == prefs.getString("active_download_model_id", null) }) }
     var downloadProgress by remember { mutableFloatStateOf(0f) }
@@ -584,11 +640,45 @@ private fun NexusChatApp(initialPath: String?) {
                                         shape = RoundedCornerShape(22.dp),
                                         modifier = Modifier.widthIn(max = 340.dp)
                                     ) {
-                                        Text(
-                                            message.text.ifBlank { "…" },
-                                            Modifier.padding(horizontal = 17.dp, vertical = 13.dp),
-                                            color = primaryText, fontSize = 16.sp, lineHeight = 24.sp
-                                        )
+                                        Column(Modifier.padding(horizontal = 17.dp, vertical = 13.dp)) {
+                                            if (message.text.isNotBlank()) {
+                                                Text(message.text, color = primaryText, fontSize = 16.sp, lineHeight = 24.sp)
+                                            } else {
+                                                Text("…", color = primaryText, fontSize = 16.sp)
+                                            }
+                                            message.contacts.forEach { contact ->
+                                                Row(
+                                                    Modifier.fillMaxWidth().padding(top = 12.dp)
+                                                        .background(surface, RoundedCornerShape(14.dp))
+                                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Column(Modifier.weight(1f)) {
+                                                        Text(contact.name, color = primaryText, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                                                        Text(contact.number, color = mutedText, fontSize = 13.sp)
+                                                    }
+                                                    Button(
+                                                        onClick = {
+                                                            pendingCallNumber = contact.number
+                                                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
+                                                                val number = pendingCallNumber
+                                                                pendingCallNumber = null
+                                                                if (!number.isNullOrBlank()) runCatching {
+                                                                    context.startActivity(Intent(Intent.ACTION_CALL, Uri.fromParts("tel", number, null)))
+                                                                }.onFailure {
+                                                                    messages.add(ChatMessage(false, "Couldn't start the call: ${it.message ?: "phone app unavailable"}."))
+                                                                }
+                                                            } else {
+                                                                callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
+                                                            }
+                                                        },
+                                                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                                                    ) {
+                                                        Text("Call")
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -754,13 +844,17 @@ private fun NexusChatApp(initialPath: String?) {
                                             deviceActions.isUnrestrictedShellRequest(prompt) ->
                                                 "NEXUS cannot run unrestricted Windows CMD, PowerShell or ADB shell commands on Android. It can run a small read-only diagnostic set: pwd, ls, date, id, uname, uptime and df. Try: cmd ls. File access and changes must use the selected NEXUS Workspace."
                                             callMatch != null -> {
-                                                // "Call <name>" intentionally opens the phone dialer only.
-                                                // It does not read contacts, select a number, or place a call.
-                                                runCatching {
-                                                    context.startActivity(Intent(Intent.ACTION_DIAL))
-                                                    "Opened the phone app. No contact was selected and no call was placed."
-                                                }.getOrElse {
-                                                    "I couldn't open the phone app: ${it.message ?: "no dialer available"}."
+                                                val name = callMatch.groupValues[1].trim()
+                                                    .removePrefix("my ").trim()
+                                                if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+                                                    val found = withContext(Dispatchers.IO) { searchContacts(context, name) }
+                                                    val reply = if (found.isEmpty()) "I couldn't find any contacts matching '$name'." else "Found ${found.size} matching contact${if (found.size == 1) "" else "s"}. Choose who you want to call:"
+                                                    if (messages.isNotEmpty()) messages[messages.lastIndex] = ChatMessage(false, reply, found)
+                                                    null
+                                                } else {
+                                                    pendingContactQuery = name
+                                                    contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                                                    "Allow Contacts access so I can show matching contacts here in the chat."
                                                 }
                                             }
                                             androidControlEnabled -> deviceActions.execute(prompt)
