@@ -1096,7 +1096,7 @@ private fun NexusChatApp(initialPath: String?) {
                                         var toolCallCount = 0
                                         while (true) {
                                             val answer = StringBuilder()
-                                            activeEngine.sendUserPrompt(nextPrompt, 512).collect { token ->
+                                            activeEngine.sendUserPrompt(nextPrompt, 320).collect { token ->
                                                 answer.append(token)
                                             }
                                             val toolCall = toolRuntime.parseToolCall(answer.toString())
