@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -111,18 +112,20 @@ private data class PendingToolApproval(
 private data class ContactResult(val name: String, val number: String)
 private data class ChatMessage(val user: Boolean, val text: String, val contacts: List<ContactResult> = emptyList())
 
-private val NexusDark = Color(0xFF0D1016)
-private val NexusDarkSurface = Color(0xFF181D27)
-private val NexusDarkBorder = Color(0xFF272E3B)
-private val NexusLight = Color(0xFFF7F8FA)
+private val NexusDark = Color(0xFF0E0B1C)
+private val NexusDarkSurface = Color(0xFF181430)
+private val NexusDarkBorder = Color(0xFF2A2548)
+private val NexusLight = Color(0xFFF6F5FC)
 private val NexusLightSurface = Color(0xFFFFFFFF)
-private val NexusLightBorder = Color(0xFFE4E7EC)
-private val NexusPurple = Color(0xFF6945F5)
-private val NexusMint = Color(0xFF35CFA5)
-private val NexusTextDark = Color(0xFFF1F3F8)
-private val NexusMutedDark = Color(0xFF8992A4)
-private val NexusTextLight = Color(0xFF171B24)
-private val NexusMutedLight = Color(0xFF707887)
+private val NexusLightBorder = Color(0xFFE8E5F6)
+private val NexusPurple = Color(0xFF8B6CFF)
+private val NexusGradientStart = Color(0xFF2A4DF5)
+private val NexusGradientEnd = Color(0xFF9B3CF8)
+private val NexusMint = Color(0xFF8B6CFF)
+private val NexusTextDark = Color(0xFFF1EEFF)
+private val NexusMutedDark = Color(0xFF9892BC)
+private val NexusTextLight = Color(0xFF15122B)
+private val NexusMutedLight = Color(0xFF78749A)
 
 private enum class NexusThemeMode { SYSTEM, LIGHT, DARK }
 
@@ -262,7 +265,7 @@ private fun NexusChatApp(initialPath: String?) {
     val border = if (isDark) NexusDarkBorder else NexusLightBorder
     val primaryText = if (isDark) NexusTextDark else NexusTextLight
     val mutedText = if (isDark) NexusMutedDark else NexusMutedLight
-    val userBubble = if (isDark) Color(0xFF242A36) else Color(0xFFECEFFD)
+    val userBubble = Color.Transparent
 
     SideEffect {
         (context as? ComponentActivity)?.window?.let { window ->
@@ -591,26 +594,6 @@ private fun NexusChatApp(initialPath: String?) {
                     Modifier.fillMaxWidth().statusBarsPadding().padding(start = 20.dp, end = 14.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(
-                        onClick = { showModels = true },
-                        color = Color.Transparent,
-                        shape = CircleShape
-                    ) {
-                        Row(
-                            Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(Modifier.size(9.dp).background(if (ready) NexusMint else Color(0xFF8A91A1), CircleShape))
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                if (apiEnabled) "Cloud API · ${apiModel}" else modelPath?.let { displayModelName(File(it).name) } ?: "Select model",
-                                color = primaryText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
-                                maxLines = 1
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text("⌄", color = mutedText, fontSize = 21.sp)
-                        }
-                    }
                     Spacer(Modifier.weight(1f))
                     Box {
                         Surface(
@@ -649,81 +632,28 @@ private fun NexusChatApp(initialPath: String?) {
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     if (messages.isEmpty()) {
                         Column(
-                            Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-                                .padding(start = 24.dp, end = 24.dp, top = 30.dp, bottom = 24.dp),
-                            horizontalAlignment = Alignment.Start
+                            Modifier.fillMaxSize().padding(horizontal = 24.dp),
+                            horizontalAlignment = Alignment.Start,
+                            verticalArrangement = Arrangement.Center
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Image(
-                                    painter = painterResource(R.drawable.nexus_logo),
-                                    contentDescription = "NEXUS AI",
-                                    modifier = Modifier.size(52.dp).clip(RoundedCornerShape(13.dp))
-                                )
-                                Spacer(Modifier.width(13.dp))
-                                Column {
-                                    Text("NEXUS", color = primaryText, fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
-                                    Text(
-                                        if (apiEnabled) "CONNECTED API" else "ON-DEVICE ASSISTANT",
-                                        color = mutedText, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.1.sp
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.height(34.dp))
                             Text(
-                                "What are we\nworking on?",
-                                color = primaryText, fontSize = 31.sp, lineHeight = 36.sp,
-                                fontWeight = FontWeight.SemiBold
+                                "Hi Anuj.\\nWhat are we\\nworking on?",
+                                color = primaryText,
+                                fontSize = 39.sp,
+                                lineHeight = 44.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = (-0.7).sp
                             )
-                            Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(14.dp))
                             Text(
-                                if (apiEnabled) "Your messages are sent to the provider configured in Settings."
-                                else "Your model runs locally. Choose a task and make it yours.",
-                                color = mutedText, fontSize = 14.sp, lineHeight = 21.sp
+                                if (apiEnabled) "Connected to your chosen AI provider."
+                                else "Runs on your phone. Private.",
+                                color = mutedText,
+                                fontSize = 17.sp,
+                                lineHeight = 24.sp
                             )
-                            Spacer(Modifier.height(30.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("QUICK START", color = mutedText, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.3.sp)
-                                Spacer(Modifier.weight(1f))
-                                Text("TAP TO DRAFT", color = mutedText, fontSize = 9.sp, letterSpacing = 1.sp)
-                            }
-                            Spacer(Modifier.height(10.dp))
-                            Column(
-                                Modifier.fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(surface)
-                            ) {
-                                Column(
-                                    Modifier.fillMaxWidth().clickable { input = "Explain a difficult idea in simple steps." }
-                                        .padding(horizontal = 15.dp, vertical = 15.dp)
-                                ) {
-                                    Text("01  /  THINK", color = NexusPurple, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                                    Spacer(Modifier.height(5.dp))
-                                    Text("Explore an idea", color = primaryText, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                                    Text("Break down a concept, compare views or reason through a question.", color = mutedText, fontSize = 12.sp, lineHeight = 17.sp)
-                                }
-                                HorizontalDivider(color = border)
-                                Column(
-                                    Modifier.fillMaxWidth().clickable { input = "Write a program and explain how it works." }
-                                        .padding(horizontal = 15.dp, vertical = 15.dp)
-                                ) {
-                                    Text("02  /  BUILD", color = NexusPurple, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                                    Spacer(Modifier.height(5.dp))
-                                    Text("Make something", color = primaryText, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                                    Text("Create code, work with files or test an implementation.", color = mutedText, fontSize = 12.sp, lineHeight = 17.sp)
-                                }
-                                HorizontalDivider(color = border)
-                                Column(
-                                    Modifier.fillMaxWidth().clickable { input = "Help me find the right app or action on my phone." }
-                                        .padding(horizontal = 15.dp, vertical = 15.dp)
-                                ) {
-                                    Text("03  /  DO", color = NexusPurple, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                                    Spacer(Modifier.height(5.dp))
-                                    Text("Get something done", color = primaryText, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                                    Text("Find an app, look up a contact or guide a phone action.", color = mutedText, fontSize = 12.sp, lineHeight = 17.sp)
-                                }
-                            }
                             if (loading) {
-                                Spacer(Modifier.height(20.dp))
+                                Spacer(Modifier.height(22.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     CircularProgressIndicator(color = NexusPurple, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
                                     Spacer(Modifier.width(10.dp))
@@ -732,15 +662,14 @@ private fun NexusChatApp(initialPath: String?) {
                             }
                             if (loadError != null) {
                                 Spacer(Modifier.height(18.dp))
-                                Surface(color = if (isDark) Color(0xFF3B2027) else Color(0xFFFFE9EA), shape = RoundedCornerShape(8.dp)) {
+                                Surface(color = if (isDark) Color(0xFF3B2027) else Color(0xFFFFE9EA), shape = RoundedCornerShape(22.dp)) {
                                     Column(Modifier.padding(16.dp)) {
                                         Text("Couldn't load model", color = Color(0xFFE36B79), fontWeight = FontWeight.Bold)
                                         Spacer(Modifier.height(6.dp))
                                         Text(loadError!!, color = primaryText, fontSize = 12.sp)
-                                        Spacer(Modifier.height(8.dp))
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             TextButton(onClick = { loadAttempt++ }) { Text("Try again") }
-                                            TextButton(onClick = { loadError = null; showModels = true }) { Text("Choose smaller model") }
+                                            TextButton(onClick = { loadError = null; showModels = true }) { Text("Choose model") }
                                         }
                                     }
                                 }
@@ -756,13 +685,17 @@ private fun NexusChatApp(initialPath: String?) {
                             itemsIndexed(messages) { _, message ->
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = if (message.user) Arrangement.End else Arrangement.Start) {
                                     Surface(
-                                        color = if (message.user) userBubble else Color.Transparent,
-                                        shape = RoundedCornerShape(if (message.user) 18.dp else 0.dp),
+                                        color = userBubble,
+                                        shape = RoundedCornerShape(if (message.user) 22.dp else 0.dp),
                                         modifier = Modifier.widthIn(max = 340.dp)
                                     ) {
-                                        Column(Modifier.padding(horizontal = if (message.user) 16.dp else 0.dp, vertical = if (message.user) 12.dp else 2.dp)) {
+                                        Column(
+                                            Modifier
+                                                .then(if (message.user) Modifier.background(Brush.horizontalGradient(listOf(NexusGradientStart, NexusGradientEnd)), RoundedCornerShape(22.dp)) else Modifier)
+                                                .padding(horizontal = if (message.user) 16.dp else 0.dp, vertical = if (message.user) 12.dp else 2.dp)
+                                        ) {
                                             if (message.text.isNotBlank()) {
-                                                Text(message.text, color = primaryText, fontSize = 16.sp, lineHeight = 24.sp)
+                                                Text(message.text, color = if (message.user) Color.White else primaryText, fontSize = 16.sp, lineHeight = 24.sp)
                                                 if (!message.user && pendingWorkspaceRetryPrompt != null && messages.lastOrNull() === message) {
                                                     Spacer(Modifier.height(10.dp))
                                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1274,11 +1207,11 @@ private fun NexusChatApp(initialPath: String?) {
                                 }
                             }
                         },
-                        color = if (ready && input.isNotBlank() && !generating) NexusPurple else surface,
+                        color = Color.Transparent,
                         shape = CircleShape,
                         modifier = Modifier.size(58.dp)
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
+                        Box(Modifier.fillMaxSize().then(if (ready && input.isNotBlank() && !generating) Modifier.background(Brush.horizontalGradient(listOf(NexusGradientStart, NexusGradientEnd)), CircleShape) else Modifier), contentAlignment = Alignment.Center) {
                             Text(if (generating) "×" else "↑", color = if (generating) Color(0xFFE36B79) else if (ready && input.isNotBlank()) Color.White else mutedText, fontSize = 28.sp, fontWeight = FontWeight.Medium)
                         }
                     }
@@ -1358,7 +1291,7 @@ private fun NexusChatApp(initialPath: String?) {
                                     },
                                     enabled = downloadId == null,
                                     shape = RoundedCornerShape(18.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = NexusMint, contentColor = Color(0xFF07110E))
+                                    colors = ButtonDefaults.buttonColors(containerColor = NexusMint, contentColor = Color(0xFF15122B))
                                 ) { Text(if (downloadModel?.id == model.id && downloadId != null) "Getting…" else "↓  Get", fontWeight = FontWeight.Bold) }
                             }
                         }
@@ -1775,7 +1708,7 @@ private fun NexusChatApp(initialPath: String?) {
                         Text("Theme", color = primaryText, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.weight(1f))
                         Row(
-                            Modifier.clip(CircleShape).background(if (isDark) Color(0xFF252B37) else Color(0xFFEEF0F4)).padding(4.dp)
+                            Modifier.clip(CircleShape).background(if (isDark) Color(0xFF241F43) else Color(0xFF241F43)).padding(4.dp)
                         ) {
                             listOf(NexusThemeMode.SYSTEM, NexusThemeMode.LIGHT, NexusThemeMode.DARK).forEach { mode ->
                                 val selected = themeMode == mode
@@ -1784,11 +1717,11 @@ private fun NexusChatApp(initialPath: String?) {
                                         themeMode = mode
                                         prefs.edit().putString("theme", mode.name).apply()
                                     },
-                                    color = if (selected) (if (isDark) Color(0xFF151A23) else Color.White) else Color.Transparent,
+                                    color = if (selected) (if (isDark) Color(0xFF211B3C) else Color.White) else Color.Transparent,
                                     shape = CircleShape
                                 ) {
                                     Text(
-                                        when (mode) { NexusThemeMode.SYSTEM -> "System"; NexusThemeMode.LIGHT -> "Light"; NexusThemeMode.DARK -> "Dark" },
+                                        when (mode) { NexusThemeMode.SYSTEM -> "Auto"; NexusThemeMode.LIGHT -> "Light"; NexusThemeMode.DARK -> "Dark" },
                                         Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                                         color = if (selected) primaryText else mutedText, fontSize = 13.sp,
                                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
@@ -1808,7 +1741,7 @@ private fun NexusChatApp(initialPath: String?) {
                     ) {
                         Text("▤", color = mutedText, fontSize = 22.sp)
                         Spacer(Modifier.width(18.dp))
-                        Text("Clear all chats", color = primaryText, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                        Text("Clear all chats", color = Color(0xFFC4472F), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                     }
                     HorizontalDivider(color = border)
                     Spacer(Modifier.height(18.dp))
@@ -1929,7 +1862,7 @@ private fun MenuEntry(symbol: String, label: String, action: () -> Unit) {
     DropdownMenuItem(
         text = { Text(label, fontSize = 16.sp) },
         onClick = action,
-        leadingIcon = { Text(symbol, fontSize = 21.sp, color = Color(0xFF8992A4)) },
+        leadingIcon = { Text(symbol, fontSize = 21.sp, color = Color(0xFF9892BC)) },
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 7.dp)
     )
 }
