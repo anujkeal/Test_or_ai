@@ -6,6 +6,9 @@ import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.ContactsContract
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import com.keal.nexus.device.NexusDeviceActions
 import com.keal.nexus.device.NexusAccessibilityService
 import android.os.Bundle
@@ -270,7 +273,14 @@ private fun NexusChatApp(initialPath: String?) {
         }
     }
 
-    LaunchedEffect(modelPath, loadAttempt) {
+    LaunchedEffect(modelPath, loadAttempt, apiEnabled) {
+        if (apiEnabled) {
+            ready = true
+            loading = false
+            loadError = null
+            showModels = false
+            return@LaunchedEffect
+        }
         if (prefs.getBoolean("model_load_in_progress", false)) {
             prefs.edit().putBoolean("model_load_in_progress", false).commit()
             ready = false
@@ -419,7 +429,8 @@ private fun NexusChatApp(initialPath: String?) {
             chatHistory = ChatHistoryStore.load(context)
         }
         currentChatId = UUID.randomUUID().toString()
-        if (ready || generating) resetChat()
+        if (apiEnabled) { messages.clear(); input = "" }
+        else if (ready || generating) resetChat()
         else { messages.clear(); input = "" }
     }
 
@@ -551,7 +562,7 @@ private fun NexusChatApp(initialPath: String?) {
                             Box(Modifier.size(9.dp).background(if (ready) NexusMint else Color(0xFF8A91A1), CircleShape))
                             Spacer(Modifier.width(10.dp))
                             Text(
-                                modelPath?.let { displayModelName(File(it).name) } ?: "Select model",
+                                if (apiEnabled) "Cloud API · ${apiModel}" else modelPath?.let { displayModelName(File(it).name) } ?: "Select model",
                                 color = primaryText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
                                 maxLines = 1
                             )
@@ -610,7 +621,7 @@ private fun NexusChatApp(initialPath: String?) {
                             Text("How can I help?", color = primaryText, fontSize = 29.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(10.dp))
                             Text(
-                                "Private. Runs on your device.",
+                                if (apiEnabled) "Connected API mode. Messages go to your provider." else "Private. Runs on your device.",
                                 color = mutedText, fontSize = 17.sp
                             )
                             if (loading) {
