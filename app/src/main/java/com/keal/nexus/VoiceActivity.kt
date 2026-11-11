@@ -70,10 +70,10 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val engine = remember { runCatching { AiChat.getInferenceEngine(context.applicationContext) }.getOrNull() }
-    val bg = Color(0xFF05070B)
-    val ink = Color(0xFFF2F5FA)
-    val muted = Color(0xFF8A94A6)
-    val accent = Color(0xFF5EE0B0)
+    val bg = Color(0xFF0E0B1C)
+    val ink = Color(0xFFF1EEFF)
+    val muted = Color(0xFF9892BC)
+    val accent = Color(0xFF8B6CFF)
 
     var visualState by remember { mutableStateOf(VoiceVisualState.IDLE) }
     var status by remember { mutableStateOf("Tap the microphone to talk") }
