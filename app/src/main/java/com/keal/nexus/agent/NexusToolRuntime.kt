@@ -185,7 +185,7 @@ class NexusToolRuntime(context: Context) {
     }
 
     fun detectRunFile(prompt: String): String? {
-        val match = Regex("""(?i)\\b(?:run|execute|start|test)\\s+(?:the\\s+)?([A-Za-z0-9_-]+\\.[A-Za-z0-9]{1,12})\\b""")
+        val match = Regex("""(?i)\b(?:run|execute|start|test)\s+(?:the\s+)?([A-Za-z0-9_-]+\.[A-Za-z0-9]{1,12})\b""")
             .find(prompt.trim()) ?: return null
         return match.groupValues[1]
     }
