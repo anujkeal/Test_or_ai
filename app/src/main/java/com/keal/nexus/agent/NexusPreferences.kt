@@ -36,6 +36,39 @@ class NexusPreferences(context: Context) {
         (0 until json.length()).mapNotNull { json.optString(it).trim().takeIf(String::isNotBlank) }
     }.getOrDefault(emptyList())
 
+    /** Saves a clearly requested personal fact from a user's message. */
+    fun saveExplicitMemoryFromPrompt(prompt: String): String? {
+        val text = prompt.trim()
+        if (text.isBlank()) return null
+        val explicitlyAsked = Regex(
+            """(?i)\\b(save this|remember this|remember that|save that|remember it|don't forget)\\b"""
+        ).containsMatchIn(text)
+        if (!explicitlyAsked) return null
+
+        val nameMatch = Regex(
+            """(?i)\\bmy name is\\s+([\\p{L}][\\p{L} .'-]{0,50}?)(?=\\s+(?:and\\s+)?(?:save|remember|don't forget)\\b|[.!?,;]|$)"""
+        ).find(text)
+        val fact = nameMatch?.groupValues?.get(1)?.trim()?.trimEnd('.', ',', ';')
+        if (!fact.isNullOrBlank()) {
+            val item = "The user's name is $fact."
+            val existed = memoryItems().any { it.equals(item, ignoreCase = true) }
+            addMemoryItem(item)
+            return if (existed) "I already had that saved. $item" else "Saved to NEXUS memory: $item"
+        }
+
+        val rememberMatch = Regex(
+            """(?i)\\b(?:remember that|save this|remember this|save that|don't forget)\\s*[:,-]?\\s*(.{3,300})$"""
+        ).find(text)
+        val genericFact = rememberMatch?.groupValues?.get(1)?.trim()?.trimEnd('.', '!', '?')
+        if (!genericFact.isNullOrBlank()) {
+            val item = genericFact.take(300)
+            val existed = memoryItems().any { it.equals(item, ignoreCase = true) }
+            addMemoryItem(item)
+            return if (existed) "I already had that saved." else "Saved to NEXUS memory: $item"
+        }
+        return "I can save that, but I couldn't identify the exact fact. Please say it as: 'Remember that [fact].'"
+    }
+
     fun addMemoryItem(value: String) {
         val clean = value.trim().take(500)
         if (clean.isBlank()) return
