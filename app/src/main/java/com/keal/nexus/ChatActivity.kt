@@ -1091,12 +1091,12 @@ private fun NexusChatApp(initialPath: String?) {
                                         var nextPrompt = prompt
                                         val latestMemory = nexusPrefs.memoryPromptSection()
                                         if (latestMemory.isNotBlank()) {
-                                            nextPrompt = "Relevant saved user context:\n" + latestMemory + "\n\nUser request: " + prompt
+                                            nextPrompt = "Relevant saved user context:\n" + latestMemory.take(1200) + "\n\nUser request: " + prompt
                                         }
                                         var toolCallCount = 0
                                         while (true) {
                                             val answer = StringBuilder()
-                                            activeEngine.sendUserPrompt(nextPrompt, 512).collect { token ->
+                                            activeEngine.sendUserPrompt(nextPrompt, 320).collect { token ->
                                                 answer.append(token)
                                             }
                                             val toolCall = toolRuntime.parseToolCall(answer.toString())
