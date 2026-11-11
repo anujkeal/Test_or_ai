@@ -237,7 +237,6 @@ private fun NexusChatApp(initialPath: String?) {
     val primaryText = if (isDark) NexusTextDark else NexusTextLight
     val mutedText = if (isDark) NexusMutedDark else NexusMutedLight
     val userBubble = if (isDark) Color(0xFF242A36) else Color(0xFFECEFFD)
-    val assistantBubble = if (isDark) Color(0xFF171C25) else Color(0xFFF0F2F5)
 
     SideEffect {
         (context as? ComponentActivity)?.window?.let { window ->
@@ -645,7 +644,7 @@ private fun NexusChatApp(initialPath: String?) {
                             }
                             Spacer(Modifier.height(34.dp))
                             Text(
-                                "What are we\\nworking on?",
+                                "What are we\nworking on?",
                                 color = primaryText, fontSize = 31.sp, lineHeight = 36.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -1663,7 +1662,11 @@ private fun NexusChatApp(initialPath: String?) {
                     }
                     HorizontalDivider(color = border)
                     Spacer(Modifier.height(18.dp))
-                    Text("NEXUS AI ${BuildConfig.VERSION_NAME} · Everything stays on your device.\nNo cloud, no tracking.", color = mutedText, fontSize = 14.sp, lineHeight = 21.sp)
+                    Text(
+                        if (apiEnabled) "NEXUS AI ${BuildConfig.VERSION_NAME} · Messages go to your configured provider."
+                        else "NEXUS AI ${BuildConfig.VERSION_NAME} · On-device mode. Chats stay on this phone.",
+                        color = mutedText, fontSize = 13.sp, lineHeight = 19.sp
+                    )
                 }
             }
             if (startupLoading) {
