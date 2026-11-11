@@ -1274,6 +1274,7 @@ private fun NexusChatApp(initialPath: String?) {
                             Text(if (generating) "×" else "↑", color = if (generating) Color(0xFFE36B79) else if (ready && input.isNotBlank()) Color.White else mutedText, fontSize = 28.sp, fontWeight = FontWeight.Medium)
                         }
                     }
+                    }
                 }
             }
 
