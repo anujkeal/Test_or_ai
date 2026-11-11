@@ -747,16 +747,6 @@ private fun NexusChatApp(initialPath: String?) {
                                 generating = true
                                 generationJob = scope.launch {
                                     try {
-                                        if (apiEnabled) {
-                                            val answer = nexusPrefs.memoryAnswer(prompt)
-                                                ?: remoteApi.reply(prompt, nexusPrefs.memoryPromptSection())
-                                            messages[messages.lastIndex] = ChatMessage(false, answer)
-                                            return@launch
-                                        }
-                                        nexusPrefs.memoryAnswer(prompt)?.let { answer ->
-                                            messages[messages.lastIndex] = ChatMessage(false, answer)
-                                            return@launch
-                                        }
                                         val runFile = toolRuntime.detectRunFile(prompt)
                                         if (runFile != null) {
                                             val runResult = if (!codeRunner.configured) {
@@ -766,6 +756,16 @@ private fun NexusChatApp(initialPath: String?) {
                                                 codeRunner.run(runFile, source).display(runFile)
                                             }
                                             messages[messages.lastIndex] = ChatMessage(false, runResult)
+                                            return@launch
+                                        }
+                                        if (apiEnabled) {
+                                            val answer = nexusPrefs.memoryAnswer(prompt)
+                                                ?: remoteApi.reply(prompt, nexusPrefs.memoryPromptSection())
+                                            messages[messages.lastIndex] = ChatMessage(false, answer)
+                                            return@launch
+                                        }
+                                        nexusPrefs.memoryAnswer(prompt)?.let { answer ->
+                                            messages[messages.lastIndex] = ChatMessage(false, answer)
                                             return@launch
                                         }
                                         val activeEngine = engine ?: error("The local inference engine is unavailable. For code execution, say 'run main.py' after configuring a code runner.")
