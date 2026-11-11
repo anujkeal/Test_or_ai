@@ -184,6 +184,18 @@ class NexusToolRuntime(context: Context) {
         return NexusToolCall("android.run_command", JSONObject().put("command", command))
     }
 
+    fun detectRunFile(prompt: String): String? {
+        val match = Regex("""(?i)\\b(?:run|execute|start|test)\\s+(?:the\\s+)?([A-Za-z0-9_-]+\\.[A-Za-z0-9]{1,12})\\b""")
+            .find(prompt.trim()) ?: return null
+        return match.groupValues[1]
+    }
+
+    fun readSourceForExecution(fileName: String): String {
+        val call = NexusToolCall("workspace.read_file", JSONObject().put("name", fileName))
+        if (!isAllowed(call)) throw SecurityException("Enable workspace.read_file and select your workspace folder before running a file.")
+        return workspace.readFile(fileName)
+    }
+
     fun describePath(fileName: String): String = workspace.describeFilePath(fileName)
 
     fun parseToolCall(output: String): NexusToolCall? {
