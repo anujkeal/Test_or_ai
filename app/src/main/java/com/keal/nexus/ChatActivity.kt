@@ -917,6 +917,12 @@ private fun NexusChatApp(initialPath: String?) {
                                 generationJob = scope.launch {
                                     try {
                                         val routedIntent = com.keal.nexus.agent.NexusIntentRouter.classify(prompt)
+                                        val cricketConnector = com.keal.nexus.agent.NexusCricketConnector()
+                                        if (cricketConnector.isCricketRequest(prompt)) {
+                                            val scoreAnswer = cricketConnector.answer(prompt)
+                                            messages[messages.lastIndex] = ChatMessage(false, scoreAnswer)
+                                            return@launch
+                                        }
                                         val runFile = toolRuntime.detectRunFile(prompt)
                                         if (runFile != null) {
                                             val runResult = if (!codeRunner.configured) {
