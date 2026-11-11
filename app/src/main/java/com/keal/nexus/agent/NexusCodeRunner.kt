@@ -1,6 +1,13 @@
 package com.keal.nexus.agent
 
 import android.content.Context
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import android.util.Base64
+import java.security.KeyStore
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.spec.GCMParameterSpec
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -36,9 +43,39 @@ class NexusCodeRunner(context: Context) {
     var endpoint: String
         get() = prefs.getString("endpoint", "") ?: ""
         set(value) { prefs.edit().putString("endpoint", value.trim().trimEnd('/')).apply() }
+    private fun encryptionKey(): java.security.Key {
+        val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        store.getKey("nexus_code_runner_token", null)?.let { return it }
+        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        generator.init(KeyGenParameterSpec.Builder("nexus_code_runner_token",
+            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            .setKeySize(256).build())
+        return generator.generateKey()
+    }
     var token: String
-        get() = prefs.getString("token", "") ?: ""
-        set(value) { prefs.edit().putString("token", value.trim()).apply() }
+        get() = runCatching {
+            val data = Base64.decode(prefs.getString("token_cipher", "") ?: "", Base64.NO_WRAP)
+            val iv = Base64.decode(prefs.getString("token_iv", "") ?: "", Base64.NO_WRAP)
+            if (data.isEmpty() || iv.isEmpty()) "" else Cipher.getInstance("AES/GCM/NoPadding").run {
+                init(Cipher.DECRYPT_MODE, encryptionKey(), GCMParameterSpec(128, iv))
+                String(doFinal(data), Charsets.UTF_8)
+            }
+        }.getOrDefault("")
+        set(value) {
+            val clean = value.trim()
+            if (clean.isBlank()) {
+                prefs.edit().remove("token_cipher").remove("token_iv").apply()
+            } else {
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                cipher.init(Cipher.ENCRYPT_MODE, encryptionKey())
+                prefs.edit()
+                    .putString("token_cipher", Base64.encodeToString(cipher.doFinal(clean.toByteArray(Charsets.UTF_8)), Base64.NO_WRAP))
+                    .putString("token_iv", Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+                    .apply()
+            }
+        }
     var configured: Boolean get() = endpoint.isNotBlank()
 
     suspend fun run(fileName: String, source: String, stdin: String = ""): CodeRunResult = withContext(Dispatchers.IO) {
