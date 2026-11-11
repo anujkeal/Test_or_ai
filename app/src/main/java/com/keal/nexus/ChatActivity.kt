@@ -844,6 +844,11 @@ private fun NexusChatApp(initialPath: String?) {
                                             messages[messages.lastIndex] = ChatMessage(false, runResult)
                                             return@launch
                                         }
+                                        nexusPrefs.memoryCommandResponse(prompt)?.let { memoryReply ->
+                                            memoryItems = nexusPrefs.memoryItems()
+                                            messages[messages.lastIndex] = ChatMessage(false, memoryReply)
+                                            return@launch
+                                        }
                                         nexusPrefs.saveExplicitMemoryFromPrompt(prompt)?.let { savedMessage ->
                                             memoryItems = nexusPrefs.memoryItems()
                                             messages[messages.lastIndex] = ChatMessage(false, savedMessage)

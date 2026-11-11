@@ -71,7 +71,14 @@ class NexusPreferences(context: Context) {
         val item = if (category == "Identity") "The user's name is $detail." else "$category: $detail"
         val existing = memoryItems()
         if (existing.any { it.equals(item, true) }) return null
-        addMemoryItem(item)
+        // New facts in a category supersede older values to avoid contradictions.
+        val categoryPrefix = "$category:"
+        val updated = if (category == "Identity") {
+            existing.filterNot { it.startsWith("The user's name is ", true) }
+        } else {
+            existing.filterNot { it.startsWith(categoryPrefix, true) }
+        }
+        replaceMemoryItems(updated + item)
         return item
     }
 
@@ -111,6 +118,34 @@ class NexusPreferences(context: Context) {
             return if (existed) "I already had that saved." else "Saved to NEXUS memory: $item"
         }
         return "I can save that, but I couldn't identify the exact fact. Please say it as: 'Remember that [fact].'"
+    }
+
+    private fun replaceMemoryItems(values: List<String>) {
+        val json = org.json.JSONArray()
+        values.takeLast(100).forEach { json.put(it.take(500)) }
+        store.edit().putString("ai_memory_items", json.toString()).apply()
+    }
+
+    /** Handles deterministic memory-management commands without asking the model. */
+    fun memoryCommandResponse(prompt: String): String? {
+        val q = prompt.trim().lowercase()
+        if (q.isBlank()) return null
+        val items = memoryItems()
+        if (Regex("""\b(what do you remember about me|show my memories|list my memories|what have you remembered)\b""").containsMatchIn(q)) {
+            return if (items.isEmpty()) "I don't have any saved memories yet." else
+                "Here is what I have saved locally:\n" + items.mapIndexed { index, item -> (index + 1).toString() + ". " + item }.joinToString("\n")
+        }
+        if (Regex("""\b(forget|delete|remove)\b.{0,25}\b(my name|my identity|name)\b""").containsMatchIn(q)) {
+            val updated = items.filterNot { it.startsWith("The user's name is ", true) }
+            if (updated.size == items.size) return "I don't have a saved name to forget."
+            replaceMemoryItems(updated)
+            return "I've removed your saved name from NEXUS memory."
+        }
+        if (Regex("""\b(forget|delete|clear|erase)\b.{0,25}\b(all|everything|all memories|my memories)\b""").containsMatchIn(q)) {
+            replaceMemoryItems(emptyList())
+            return "All saved NEXUS memories have been cleared from this app."
+        }
+        return null
     }
 
     fun addMemoryItem(value: String) {
