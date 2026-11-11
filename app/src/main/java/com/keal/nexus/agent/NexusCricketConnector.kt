@@ -68,7 +68,7 @@ class NexusCricketConnector {
                 )
             }
             if (parsed.isEmpty()) {
-                "I couldn't find any cricket matches in the live-score feed right now. This may mean there are no listed matches, or the provider response format has changed.\\n\\n$ATTRIBUTION"
+                "I couldn't find any cricket matches in the live-score feed right now. This may mean there are no listed matches, or the provider response format has changed.\n\n$ATTRIBUTION"
             } else {
                 val q = prompt.lowercase()
                 val selected = if (q.contains("india")) parsed.filter {
@@ -76,19 +76,19 @@ class NexusCricketConnector {
                 }.ifEmpty { parsed } else parsed
                 val heading = if (q.contains("today")) "Cricket matches listed for today" else "Cricket live and recent matches"
                 buildString {
-                    append(heading).append(":\\n\\n")
+                    append(heading).append(":\n\n")
                     selected.take(12).forEach { match ->
-                        append(match.home).append(" vs ").append(match.away).append('\\n')
+                        append(match.home).append(" vs ").append(match.away).append('\n')
                         if (match.homeScore.isNotBlank() || match.awayScore.isNotBlank()) {
                             append(match.home).append(": ").append(match.homeScore.ifBlank { "—" })
                                 .append("  |  ").append(match.away).append(": ")
-                                .append(match.awayScore.ifBlank { "—" }).append('\\n')
+                                .append(match.awayScore.ifBlank { "—" }).append('\n')
                         }
                         append(match.status)
                         if (match.time.isNotBlank()) append(" · ").append(match.time)
-                        append("\\n\\n")
+                        append("\n\n")
                     }
-                    append("Scores may update with a delay. For exact ball-by-ball details, open a live scorecard.\\n")
+                    append("Scores may update with a delay. For exact ball-by-ball details, open a live scorecard.\n")
                     append(ATTRIBUTION)
                 }
             }
