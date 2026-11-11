@@ -968,8 +968,16 @@ private fun NexusChatApp(initialPath: String?) {
                                                             pendingToolApproval = PendingToolApproval(writeCall, decision)
                                                             val approved = decision.await()
                                                             pendingToolApproval = null
-                                                            if (approved) withContext(Dispatchers.IO) {
-                                                                toolRuntime.execute(writeCall, userApproved = true)
+                                                            if (approved) {
+                                                                val saved = withContext(Dispatchers.IO) {
+                                                                    toolRuntime.execute(writeCall, userApproved = true)
+                                                                }
+                                                                if (saved.startsWith("Tool result: Saved ") && codeRunner.configured) {
+                                                                    val source = withContext(Dispatchers.IO) { toolRuntime.readSourceForExecution(fileName) }
+                                                                    saved + "\n\n" + codeRunner.run(fileName, source).display(fileName)
+                                                                } else if (saved.startsWith("Tool result: Saved ")) {
+                                                                    saved + "\n\nTo see the program output, configure a Piston-compatible server in Settings → Code execution, then say: run $fileName"
+                                                                } else saved
                                                             } else "File creation cancelled. No file was written."
                                                         }
                                                     }
