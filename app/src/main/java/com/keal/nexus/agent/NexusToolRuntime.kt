@@ -1,6 +1,7 @@
 package com.keal.nexus.agent
 
 import android.content.Context
+import android.os.Build
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -14,6 +15,39 @@ class NexusToolRuntime(context: Context) {
     private val workspace = WorkspaceStore(context.applicationContext)
     private val preferences = NexusPreferences(context.applicationContext)
     private val registry = McpToolRegistry(workspace, preferences)
+
+    /** Reads real device identity from Android; short follow-ups are resolved only
+     * when recent conversation explicitly asked for the phone/device model. */
+    fun deviceInfoResponse(prompt: String, recentContext: String = ""): String? {
+        val text = prompt.trim().lowercase()
+        if (text.isBlank()) return null
+        val direct = listOf(
+            Regex("""\b(what|which|tell me|show|get)\b.{0,45}\b(phone|device|mobile)\b.{0,35}\b(model|name|number|am i using)\b"""),
+            Regex("""\b(model number|device model|phone model|what phone is this|which phone is this)\b"""),
+            Regex("""\b(what is|tell me)\b.{0,30}\b(my|this)\b.{0,15}\b(oppo|android)\b""")
+        ).any { it.containsMatchIn(text) }
+        val priorAskedForModel = Regex("""(?is)\b(model number|device model|phone model|which phone|what phone|what device)\b""")
+            .containsMatchIn(recentContext)
+        val shortFollowUp = text.length <= 90 && listOf(
+            "now tell me", "tell me now", "but you have access", "you have access",
+            "you can access", "then tell me", "so tell me", "check it", "find it"
+        ).any { text.contains(it) }
+        if (!direct && !(priorAskedForModel && shortFollowUp)) return null
+
+        val manufacturer = Build.MANUFACTURER.orEmpty().trim()
+        val model = Build.MODEL.orEmpty().trim()
+        val device = Build.DEVICE.orEmpty().trim()
+        val version = Build.VERSION.RELEASE.orEmpty().trim()
+        if (model.isBlank()) return "Android did not provide a phone model name to NEXUS. Check Settings → About device."
+        return buildString {
+            append("Your phone reports these details to NEXUS:\n")
+            if (manufacturer.isNotBlank()) append("Manufacturer: ").append(manufacturer).append('\n')
+            append("Model: ").append(model).append('\n')
+            if (device.isNotBlank()) append("Device code: ").append(device).append('\n')
+            if (version.isNotBlank()) append("Android version: ").append(version).append('\n')
+            append("\nRead directly from Android system properties; no internet or extra permission is needed.")
+        }
+    }
 
     fun systemPrompt(): String = buildString {
         append("You are NEXUS, a private AI assistant running locally on Android. Be concise, accurate, and honest. ")
