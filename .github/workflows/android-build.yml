@@ -1,9 +1,6 @@
 name: Android APK
 
 on:
-  push:
-    branches:
-      - feature/nexus-lavender-ui
   workflow_dispatch:
 
 permissions:
