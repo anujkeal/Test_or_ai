@@ -76,7 +76,7 @@ class NexusCodeRunner(context: Context) {
                     .apply()
             }
         }
-    var configured: Boolean get() = endpoint.isNotBlank()
+    val configured: Boolean get() = endpoint.isNotBlank()
 
     suspend fun run(fileName: String, source: String, stdin: String = ""): CodeRunResult = withContext(Dispatchers.IO) {
         require(source.isNotBlank()) { "The selected source file is empty." }
