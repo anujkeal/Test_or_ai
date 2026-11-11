@@ -182,6 +182,7 @@ private fun NexusChatApp(initialPath: String?) {
     var selectedShortcutPackage by remember { mutableStateOf<String?>(null) }
     var installedApps by remember { mutableStateOf(emptyList<Pair<String, String>>()) }
     var customShortcuts by remember { mutableStateOf(nexusPrefs.appShortcuts()) }
+    var pendingWorkspaceRetryPrompt by remember { mutableStateOf<String?>(null) }
     var showHistory by remember { mutableStateOf(false) }
     var chatHistory by remember { mutableStateOf(ChatHistoryStore.load(context)) }
     var currentChatId by remember { mutableStateOf(UUID.randomUUID().toString()) }
@@ -737,6 +738,18 @@ private fun NexusChatApp(initialPath: String?) {
                                         Column(Modifier.padding(horizontal = if (message.user) 16.dp else 0.dp, vertical = if (message.user) 12.dp else 2.dp)) {
                                             if (message.text.isNotBlank()) {
                                                 Text(message.text, color = primaryText, fontSize = 16.sp, lineHeight = 24.sp)
+                                                if (!message.user && pendingWorkspaceRetryPrompt != null && messages.lastOrNull() === message) {
+                                                    Spacer(Modifier.height(10.dp))
+                                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                        TextButton(onClick = {
+                                                            context.startActivity(android.content.Intent(context, com.keal.nexus.agent.AgentActivity::class.java))
+                                                        }) { Text("Open workspace settings") }
+                                                        TextButton(onClick = {
+                                                            input = pendingWorkspaceRetryPrompt.orEmpty()
+                                                            pendingWorkspaceRetryPrompt = null
+                                                        }) { Text("Retry original request") }
+                                                    }
+                                                }
                                             } else {
                                                 Text("…", color = primaryText, fontSize = 16.sp)
                                             }
@@ -1008,7 +1021,8 @@ private fun NexusChatApp(initialPath: String?) {
                                                     val callWithoutContent = toolRuntime.callFor(workspaceIntent.action, fileName)
                                                         ?: error("Could not prepare the file write.")
                                                     if (!toolRuntime.isAllowed(callWithoutContent)) {
-                                                        "I did not create the file. Select a workspace folder and enable workspace.write_file in Workspace permissions, then try again."
+                                                        pendingWorkspaceRetryPrompt = prompt
+                                                        "Workspace setup is required before I can create this file. Open Workspace folder, select a folder, enable Create file (workspace.write_file), then return here and tap Retry original request. I have kept your original request."
                                                     } else {
                                                         val rawContent = StringBuilder()
                                                         try {
@@ -1669,103 +1683,105 @@ private fun NexusChatApp(initialPath: String?) {
                     )
                 }
             }
-            if (startupLoading) {
-                Box(
-                    Modifier.fillMaxSize()
-                        .background(background)
-                        .pointerInput(Unit) {
-                            awaitPointerEventScope {
-                                while (true) {
-                                    awaitPointerEvent().changes.forEach { it.consume() }
-                                }
+
+        }
+        }
+        if (startupLoading) {
+            Box(
+                Modifier.fillMaxSize()
+                    .background(background)
+                    .pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                awaitPointerEvent().changes.forEach { it.consume() }
                             }
                         }
-                ) {
-                    Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(Modifier.size(9.dp).background(NexusMint, CircleShape))
-                            Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    modelPath?.let { displayModelName(File(it).name) } ?: "NEXUS AI",
-                                    color = primaryText, fontSize = 17.sp, fontWeight = FontWeight.SemiBold
-                                )
-                                Text("Starting up", color = mutedText, fontSize = 12.sp)
-                            }
-                            Spacer(Modifier.weight(1f))
+                    }
+            ) {
+                Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(Modifier.size(9.dp).background(NexusMint, CircleShape))
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                modelPath?.let { displayModelName(File(it).name) } ?: "NEXUS AI",
+                                color = primaryText, fontSize = 17.sp, fontWeight = FontWeight.SemiBold
+                            )
+                            Text("Starting up", color = mutedText, fontSize = 12.sp)
+                        }
+                        Spacer(Modifier.weight(1f))
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = NexusPurple,
+                            strokeWidth = 2.dp
+                        )
+                    }
+                    Column(
+                        Modifier.weight(1f).fillMaxWidth().padding(horizontal = 30.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(148.dp)) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
+                                modifier = Modifier.fillMaxSize(),
                                 color = NexusPurple,
-                                strokeWidth = 2.dp
+                                trackColor = if (isDark) Color(0xFF252D3A) else Color(0xFFE7EAF0),
+                                strokeWidth = 5.dp
+                            )
+                            Image(
+                                painter = painterResource(R.drawable.nexus_logo),
+                                contentDescription = "NEXUS AI",
+                                modifier = Modifier.size(82.dp).clip(RoundedCornerShape(24.dp))
                             )
                         }
-                        Column(
-                            Modifier.weight(1f).fillMaxWidth().padding(horizontal = 30.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                        Spacer(Modifier.height(30.dp))
+                        Text(
+                            "Getting NEXUS ready",
+                            color = primaryText,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(9.dp))
+                        Text(
+                            loadStage + "…",
+                            color = mutedText,
+                            fontSize = 14.sp
+                        )
+                        Spacer(Modifier.height(20.dp))
+                        Surface(
+                            color = if (isDark) Color(0xFF1F2631) else Color(0xFFECEFF4),
+                            shape = CircleShape
                         ) {
-                            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(148.dp)) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.fillMaxSize(),
-                                    color = NexusPurple,
-                                    trackColor = if (isDark) Color(0xFF252D3A) else Color(0xFFE7EAF0),
-                                    strokeWidth = 5.dp
-                                )
-                                Image(
-                                    painter = painterResource(R.drawable.nexus_logo),
-                                    contentDescription = "NEXUS AI",
-                                    modifier = Modifier.size(82.dp).clip(RoundedCornerShape(24.dp))
-                                )
-                            }
-                            Spacer(Modifier.height(30.dp))
                             Text(
-                                "Getting NEXUS ready",
-                                color = primaryText,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(Modifier.height(9.dp))
-                            Text(
-                                loadStage + "…",
+                                "Please keep the app open",
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
                                 color = mutedText,
-                                fontSize = 14.sp
-                            )
-                            Spacer(Modifier.height(20.dp))
-                            Surface(
-                                color = if (isDark) Color(0xFF1F2631) else Color(0xFFECEFF4),
-                                shape = CircleShape
-                            ) {
-                                Text(
-                                    "Please keep the app open",
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
-                                    color = mutedText,
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp)
-                                .clip(RoundedCornerShape(28.dp))
-                                .background(if (isDark) Color(0xFF1F2631) else Color(0xFFFFFFFF))
-                                .padding(horizontal = 18.dp, vertical = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                color = NexusPurple,
-                                strokeWidth = 2.dp
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Text(
-                                "Loading model · " + loadStage,
-                                color = mutedText,
-                                fontSize = 13.sp,
-                                maxLines = 1
+                                fontSize = 12.sp
                             )
                         }
+                    }
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp)
+                            .clip(RoundedCornerShape(28.dp))
+                            .background(if (isDark) Color(0xFF1F2631) else Color(0xFFFFFFFF))
+                            .padding(horizontal = 18.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = NexusPurple,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            "Loading model · " + loadStage,
+                            color = mutedText,
+                            fontSize = 13.sp,
+                            maxLines = 1
+                        )
                     }
                 }
             }
