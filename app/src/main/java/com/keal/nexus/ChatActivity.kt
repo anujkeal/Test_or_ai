@@ -624,31 +624,90 @@ private fun NexusChatApp(initialPath: String?) {
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     if (messages.isEmpty()) {
                         Column(
-                            Modifier.fillMaxSize().padding(horizontal = 28.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                            Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                                .padding(start = 24.dp, end = 24.dp, top = 30.dp, bottom = 24.dp),
+                            horizontalAlignment = Alignment.Start
                         ) {
-                            Image(
-                                painter = painterResource(R.drawable.nexus_logo),
-                                contentDescription = "NEXUS AI",
-                                modifier = Modifier.size(120.dp)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Image(
+                                    painter = painterResource(R.drawable.nexus_logo),
+                                    contentDescription = "NEXUS AI",
+                                    modifier = Modifier.size(52.dp).clip(RoundedCornerShape(13.dp))
+                                )
+                                Spacer(Modifier.width(13.dp))
+                                Column {
+                                    Text("NEXUS", color = primaryText, fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
+                                    Text(
+                                        if (apiEnabled) "CONNECTED API" else "ON-DEVICE ASSISTANT",
+                                        color = mutedText, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.1.sp
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(34.dp))
+                            Text(
+                                "What are we\\nworking on?",
+                                color = primaryText, fontSize = 31.sp, lineHeight = 36.sp,
+                                fontWeight = FontWeight.SemiBold
                             )
-                            Spacer(Modifier.height(28.dp))
-                            Text("How can I help?", color = primaryText, fontSize = 29.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(10.dp))
                             Text(
-                                if (apiEnabled) "Connected API mode. Messages go to your provider." else "Private. Runs on your device.",
-                                color = mutedText, fontSize = 17.sp
+                                if (apiEnabled) "Your messages are sent to the provider configured in Settings."
+                                else "Your model runs locally. Choose a task and make it yours.",
+                                color = mutedText, fontSize = 14.sp, lineHeight = 21.sp
                             )
+                            Spacer(Modifier.height(30.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("QUICK START", color = mutedText, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.3.sp)
+                                Spacer(Modifier.weight(1f))
+                                Text("TAP TO DRAFT", color = mutedText, fontSize = 9.sp, letterSpacing = 1.sp)
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            Column(
+                                Modifier.fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(surface)
+                            ) {
+                                Column(
+                                    Modifier.fillMaxWidth().clickable { input = "Explain a difficult idea in simple steps." }
+                                        .padding(horizontal = 15.dp, vertical = 15.dp)
+                                ) {
+                                    Text("01  /  THINK", color = NexusPurple, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                    Spacer(Modifier.height(5.dp))
+                                    Text("Explore an idea", color = primaryText, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                                    Text("Break down a concept, compare views or reason through a question.", color = mutedText, fontSize = 12.sp, lineHeight = 17.sp)
+                                }
+                                HorizontalDivider(color = border)
+                                Column(
+                                    Modifier.fillMaxWidth().clickable { input = "Write a program and explain how it works." }
+                                        .padding(horizontal = 15.dp, vertical = 15.dp)
+                                ) {
+                                    Text("02  /  BUILD", color = NexusPurple, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                    Spacer(Modifier.height(5.dp))
+                                    Text("Make something", color = primaryText, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                                    Text("Create code, work with files or test an implementation.", color = mutedText, fontSize = 12.sp, lineHeight = 17.sp)
+                                }
+                                HorizontalDivider(color = border)
+                                Column(
+                                    Modifier.fillMaxWidth().clickable { input = "Help me find the right app or action on my phone." }
+                                        .padding(horizontal = 15.dp, vertical = 15.dp)
+                                ) {
+                                    Text("03  /  DO", color = NexusPurple, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                                    Spacer(Modifier.height(5.dp))
+                                    Text("Get something done", color = primaryText, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                                    Text("Find an app, look up a contact or guide a phone action.", color = mutedText, fontSize = 12.sp, lineHeight = 17.sp)
+                                }
+                            }
                             if (loading) {
-                                Spacer(Modifier.height(22.dp))
-                                CircularProgressIndicator(color = NexusPurple, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
-                                Spacer(Modifier.height(8.dp))
-                                Text(if (restoringHistory) "Restoring conversation…" else "$loadStage…", color = mutedText, fontSize = 13.sp)
+                                Spacer(Modifier.height(20.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    CircularProgressIndicator(color = NexusPurple, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(10.dp))
+                                    Text(if (restoringHistory) "Restoring conversation…" else "$loadStage…", color = mutedText, fontSize = 12.sp)
+                                }
                             }
                             if (loadError != null) {
                                 Spacer(Modifier.height(18.dp))
-                                Surface(color = if (isDark) Color(0xFF3B2027) else Color(0xFFFFE9EA), shape = RoundedCornerShape(16.dp)) {
+                                Surface(color = if (isDark) Color(0xFF3B2027) else Color(0xFFFFE9EA), shape = RoundedCornerShape(8.dp)) {
                                     Column(Modifier.padding(16.dp)) {
                                         Text("Couldn't load model", color = Color(0xFFE36B79), fontWeight = FontWeight.Bold)
                                         Spacer(Modifier.height(6.dp))
@@ -672,11 +731,11 @@ private fun NexusChatApp(initialPath: String?) {
                             itemsIndexed(messages) { _, message ->
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = if (message.user) Arrangement.End else Arrangement.Start) {
                                     Surface(
-                                        color = if (message.user) userBubble else assistantBubble,
-                                        shape = RoundedCornerShape(22.dp),
+                                        color = if (message.user) userBubble else Color.Transparent,
+                                        shape = RoundedCornerShape(if (message.user) 18.dp else 0.dp),
                                         modifier = Modifier.widthIn(max = 340.dp)
                                     ) {
-                                        Column(Modifier.padding(horizontal = 17.dp, vertical = 13.dp)) {
+                                        Column(Modifier.padding(horizontal = if (message.user) 16.dp else 0.dp, vertical = if (message.user) 12.dp else 2.dp)) {
                                             if (message.text.isNotBlank()) {
                                                 Text(message.text, color = primaryText, fontSize = 16.sp, lineHeight = 24.sp)
                                             } else {
