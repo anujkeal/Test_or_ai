@@ -591,14 +591,6 @@ private fun NexusChatApp(initialPath: String?) {
                     Modifier.fillMaxWidth().statusBarsPadding().padding(start = 20.dp, end = 14.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(onClick = {
-                        context.startActivity(Intent(context, VoiceActivity::class.java)
-                            .putExtra(VoiceActivity.EXTRA_MODEL_PATH, modelPath))
-                    }, color = Color.Transparent, shape = CircleShape) {
-                        Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                            Text("🎙", fontSize = 20.sp, color = primaryText)
-                        }
-                    }
                     Surface(
                         onClick = { showModels = true },
                         color = Color.Transparent,
@@ -900,6 +892,14 @@ private fun NexusChatApp(initialPath: String?) {
                             disabledTextColor = mutedText
                         )
                     )
+                    Surface(onClick = {
+                        context.startActivity(Intent(context, VoiceActivity::class.java)
+                            .putExtra(VoiceActivity.EXTRA_MODEL_PATH, modelPath))
+                    }, color = Color.Transparent, shape = CircleShape) {
+                        Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                            Text("🎙", fontSize = 20.sp, color = primaryText)
+                        }
+                    }
                     Surface(
                         onClick = {
                             val typedPrompt = input.trim()
@@ -1198,7 +1198,8 @@ private fun NexusChatApp(initialPath: String?) {
                                         val latestMemory = nexusPrefs.memoryPromptSection()
                                         if (latestMemory.isNotBlank()) {
                                             nextPrompt = (if (intentGuidance.isNotBlank()) intentGuidance + "\n\n" else "") +
-                                                "Relevant saved user context:\n" + latestMemory.take(1200) + "\n\nUser request: " + prompt
+                                                "Relevant saved user context:\n" + latestMemory.take(1200) +
+                                                "\n\n" + (if (activeDocument != null) nextPrompt else "User request: " + prompt)
                                         }
                                         var toolCallCount = 0
                                         while (true) {
