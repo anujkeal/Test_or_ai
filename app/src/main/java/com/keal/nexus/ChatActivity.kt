@@ -5,7 +5,6 @@ import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.provider.ContactsContract
 import com.keal.nexus.device.NexusDeviceActions
 import com.keal.nexus.device.NexusAccessibilityService
 import android.os.Bundle
@@ -148,45 +147,6 @@ private fun NexusChatApp(initialPath: String?) {
     var importError by remember { mutableStateOf<String?>(null) }
     var installed by remember { mutableStateOf(ModelManager.installedModels(context)) }
     val messages = remember { mutableStateListOf<ChatMessage>() }
-    var selectedCallName by remember { mutableStateOf<String?>(null) }
-    val contactPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val contactUri = result.data?.data
-        val requestedName = selectedCallName ?: "contact"
-        if (result.resultCode == android.app.Activity.RESULT_OK && contactUri != null) {
-            val selectedContact = runCatching {
-                context.contentResolver.query(
-                    contactUri,
-                    arrayOf(
-                        ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-                        ContactsContract.CommonDataKinds.Phone.NUMBER
-                    ),
-                    null, null, null
-                )?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        cursor.getString(0).orEmpty() to cursor.getString(1).orEmpty()
-                    } else null
-                }
-            }.getOrNull()
-            val phone = selectedContact?.second
-            if (!phone.isNullOrBlank()) {
-                val dialIntent = Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", phone, null))
-                runCatching {
-                    context.startActivity(dialIntent)
-                    messages.add(ChatMessage(false,
-                        "Opened the phone dialer for ${selectedContact.first.ifBlank { requestedName }}. Review the number and tap the call button to place the call."))
-                }.onFailure {
-                    messages.add(ChatMessage(false, "I found the contact, but couldn't open the phone dialer: ${it.message ?: "no dialer available"}"))
-                }
-            } else {
-                messages.add(ChatMessage(false, "I couldn't read a phone number for that contact. Please choose a contact with a saved phone number."))
-            }
-        } else if (result.resultCode != android.app.Activity.RESULT_OK) {
-            messages.add(ChatMessage(false, "Contact selection cancelled. No call was placed."))
-        }
-        selectedCallName = null
-    }
-
-
     val listState = rememberLazyListState()
 
     val isDark = when (themeMode) {
@@ -793,16 +753,16 @@ private fun NexusChatApp(initialPath: String?) {
                                                 "Android command control is disabled. Enable it in NEXUS Settings first."
                                             deviceActions.isUnrestrictedShellRequest(prompt) ->
                                                 "NEXUS cannot run unrestricted Windows CMD, PowerShell or ADB shell commands on Android. It can run a small read-only diagnostic set: pwd, ls, date, id, uname, uptime and df. Try: cmd ls. File access and changes must use the selected NEXUS Workspace."
-                                            callMatch != null && androidControlEnabled -> {
-                                                val name = callMatch.groupValues[1].trim()
-                                                selectedCallName = name
-                                                contactPicker.launch(
-                                                    Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI)
-                                                )
-                                                "Choose $name from your contacts. I'll open the dialer with the selected number; confirm the call there."
+                                            callMatch != null -> {
+                                                // "Call <name>" intentionally opens the phone dialer only.
+                                                // It does not read contacts, select a number, or place a call.
+                                                runCatching {
+                                                    context.startActivity(Intent(Intent.ACTION_DIAL))
+                                                    "Opened the phone app. No contact was selected and no call was placed."
+                                                }.getOrElse {
+                                                    "I couldn't open the phone app: ${it.message ?: "no dialer available"}."
+                                                }
                                             }
-                                            callMatch != null ->
-                                                "Phone actions are disabled. Enable Android command control in NEXUS Settings first."
                                             androidControlEnabled -> deviceActions.execute(prompt)
                                             deviceActions.isSupportedDeviceRequest(prompt) ->
                                                 "Android command control is disabled. Open NEXUS Settings and enable it to use this device action."
