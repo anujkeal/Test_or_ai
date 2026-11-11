@@ -79,6 +79,16 @@ class NexusPreferences(context: Context) {
         store.edit().putString("custom_app_shortcuts", json.toString()).apply()
     }
 
+    fun memoryAnswer(question: String): String? {
+        val q = question.trim().lowercase()
+        if (!Regex("""\\b(what(?:'s| is) my name|do you know my name|who am i|tell me my name)\\b""").containsMatchIn(q)) return null
+        val candidates = memoryItems().mapNotNull { entry ->
+            val match = Regex("""(?i)\\b(?:my name is|i am called|call me|name:)\\s+([\\p{L}][\\p{L} .'-]{0,60})""").find(entry)
+            match?.groupValues?.get(1)?.trim()?.trimEnd('.')?.takeIf { it.isNotBlank() }
+        }
+        return candidates.lastOrNull()?.let { "Your name is $it, according to your saved NEXUS memory." }
+    }
+
     fun memoryPromptSection(): String {
         val items = memoryItems()
         if (items.isEmpty()) return ""
