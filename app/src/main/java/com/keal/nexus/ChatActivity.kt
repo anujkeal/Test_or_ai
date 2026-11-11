@@ -279,8 +279,8 @@ private fun NexusChatApp(initialPath: String?) {
         }
     }
 
-    LaunchedEffect(modelPath, loadAttempt, apiEnabled, runnerConfigured) {
-        if (apiEnabled || runnerConfigured) {
+    LaunchedEffect(modelPath, loadAttempt, apiEnabled) {
+        if (apiEnabled) {
             ready = true
             loading = false
             loadError = null
