@@ -177,6 +177,7 @@ private fun NexusChatApp(initialPath: String?) {
     val nexusPrefs = remember { NexusPreferences(context) }
     var memoryItems by remember { mutableStateOf(nexusPrefs.memoryItems()) }
     var memoryDraft by remember { mutableStateOf("") }
+    var automaticMemoryEnabled by remember { mutableStateOf(nexusPrefs.automaticMemoryEnabled) }
     var showShortcutManager by remember { mutableStateOf(false) }
     var shortcutAlias by remember { mutableStateOf("") }
     var selectedShortcutPackage by remember { mutableStateOf<String?>(null) }
@@ -1569,9 +1570,10 @@ private fun NexusChatApp(initialPath: String?) {
                             Text("Learn preferences, learning topics, projects and goals from clear statements. Sensitive categories are excluded.", color = mutedText, fontSize = 12.sp, lineHeight = 17.sp)
                         }
                         Switch(
-                            checked = nexusPrefs.automaticMemoryEnabled,
+                            checked = automaticMemoryEnabled,
                             onCheckedChange = { enabled ->
                                 nexusPrefs.automaticMemoryEnabled = enabled
+                                automaticMemoryEnabled = enabled
                             }
                         )
                     }
