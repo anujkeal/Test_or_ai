@@ -843,6 +843,11 @@ private fun NexusChatApp(initialPath: String?) {
                                             messages[messages.lastIndex] = ChatMessage(false, runResult)
                                             return@launch
                                         }
+                                        nexusPrefs.saveExplicitMemoryFromPrompt(prompt)?.let { savedMessage ->
+                                            memoryItems = nexusPrefs.memoryItems()
+                                            messages[messages.lastIndex] = ChatMessage(false, savedMessage)
+                                            return@launch
+                                        }
                                         if (apiEnabled) {
                                             val answer = nexusPrefs.memoryAnswer(prompt)
                                                 ?: remoteApi.reply(prompt, nexusPrefs.memoryPromptSection())
