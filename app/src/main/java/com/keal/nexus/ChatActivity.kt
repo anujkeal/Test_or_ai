@@ -833,6 +833,7 @@ private fun NexusChatApp(initialPath: String?) {
                                 generating = true
                                 generationJob = scope.launch {
                                     try {
+                                        val routedIntent = com.keal.nexus.agent.NexusIntentRouter.classify(prompt)
                                         val runFile = toolRuntime.detectRunFile(prompt)
                                         if (runFile != null) {
                                             val runResult = if (!codeRunner.configured) {
@@ -1104,6 +1105,8 @@ private fun NexusChatApp(initialPath: String?) {
                                             if (messages.isNotEmpty()) messages[messages.lastIndex] = ChatMessage(false, intentResult)
                                         } else {
                                         var nextPrompt = prompt
+                                        val intentGuidance = com.keal.nexus.agent.NexusIntentRouter.modelGuidance(routedIntent)
+                                        if (intentGuidance.isNotBlank()) nextPrompt = intentGuidance + "\n\n" + nextPrompt
                                         val latestMemory = nexusPrefs.memoryPromptSection()
                                         if (latestMemory.isNotBlank()) {
                                             nextPrompt = "Relevant saved user context:\n" + latestMemory.take(1200) + "\n\nUser request: " + prompt
