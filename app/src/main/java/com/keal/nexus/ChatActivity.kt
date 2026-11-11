@@ -858,6 +858,8 @@ private fun NexusChatApp(initialPath: String?) {
                                         val callMatch = Regex("^(?:please\\s+)?(?:call|dial|phone)\\s+(?:my\\s+)?(.+)$", RegexOption.IGNORE_CASE).matchEntire(prompt)
                                         val deviceActions = NexusDeviceActions(context.applicationContext)
                                         val androidControlEnabled = prefs.getBoolean("android_control_enabled", false)
+                                        val recentConversationContext = messages.dropLast(2).takeLast(6).joinToString("\n") { it.text }
+                                        val deviceInfoResult = toolRuntime.deviceInfoResponse(prompt, recentConversationContext)
                                         val phoneAgentResult = if (PhoneControlAgent.isMultiStepGoal(prompt) && !deviceActions.isSupportedDeviceRequest(prompt)) {
                                             if (!androidControlEnabled) {
                                                 "Phone control is disabled. Enable Android command control in NEXUS Settings first."
@@ -964,7 +966,7 @@ private fun NexusChatApp(initialPath: String?) {
                                                 finalResult ?: "I stopped after 8 actions to keep phone control bounded. Tell me to continue if the task is not finished."
                                             }
                                         } else null
-                                        val deviceResult = phoneAgentResult ?: when {
+                                        val deviceResult = deviceInfoResult ?: phoneAgentResult ?: when {
                                             toolRuntime.androidCommandHelpResponse(prompt) != null ->
                                                 toolRuntime.androidCommandHelpResponse(prompt)!!
                                             toolRuntime.detectAndroidCommand(prompt) != null && androidControlEnabled -> {
