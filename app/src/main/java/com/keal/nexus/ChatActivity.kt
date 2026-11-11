@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arm.aichat.AiChat
 import com.arm.aichat.InferenceEngine
+import com.keal.nexus.agent.NexusRemoteApi
 import com.keal.nexus.agent.NexusPreferences
 import com.keal.nexus.agent.NexusToolCall
 import com.keal.nexus.agent.NexusToolRuntime
@@ -135,6 +136,12 @@ private fun NexusChatApp(initialPath: String?) {
     val prefs = remember { context.getSharedPreferences("nexus_preferences", Context.MODE_PRIVATE) }
     val scope = rememberCoroutineScope()
     val toolRuntime = remember { NexusToolRuntime(context) }
+    val remoteApi = remember { NexusRemoteApi(context) }
+    var apiEnabled by remember { mutableStateOf(remoteApi.enabled) }
+    var apiEndpoint by remember { mutableStateOf(remoteApi.endpoint) }
+    var apiModel by remember { mutableStateOf(remoteApi.model) }
+    var apiKeyDraft by remember { mutableStateOf("") }
+    var apiStatus by remember { mutableStateOf("") }
 
     var themeMode by remember {
         mutableStateOf(runCatching {
@@ -723,6 +730,16 @@ private fun NexusChatApp(initialPath: String?) {
                                 generating = true
                                 generationJob = scope.launch {
                                     try {
+                                        if (apiEnabled) {
+                                            val answer = nexusPrefs.memoryAnswer(prompt)
+                                                ?: remoteApi.reply(prompt, nexusPrefs.memoryPromptSection())
+                                            messages[messages.lastIndex] = ChatMessage(false, answer)
+                                            return@launch
+                                        }
+                                        nexusPrefs.memoryAnswer(prompt)?.let { answer ->
+                                            messages[messages.lastIndex] = ChatMessage(false, answer)
+                                            return@launch
+                                        }
                                         val activeEngine = engine ?: error("The local inference engine is unavailable.")
                                         // Explicit device requests are handled by Android, not by model-generated claims.
                                         val callMatch = Regex("^(?:please\\s+)?(?:call|dial|phone)\\s+(?:my\\s+)?(.+)$", RegexOption.IGNORE_CASE).matchEntire(prompt)
@@ -948,6 +965,10 @@ private fun NexusChatApp(initialPath: String?) {
                                             if (messages.isNotEmpty()) messages[messages.lastIndex] = ChatMessage(false, intentResult)
                                         } else {
                                         var nextPrompt = prompt
+                                        val latestMemory = nexusPrefs.memoryPromptSection()
+                                        if (latestMemory.isNotBlank()) {
+                                            nextPrompt = "Relevant saved user context:\n" + latestMemory + "\n\nUser request: " + prompt
+                                        }
                                         var toolCallCount = 0
                                         while (true) {
                                             val answer = StringBuilder()
@@ -1317,6 +1338,56 @@ private fun NexusChatApp(initialPath: String?) {
                 Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp).padding(bottom = 30.dp)) {
                     Text("Settings", color = primaryText, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(18.dp))
+                    Text("AI provider", color = primaryText, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Use your own OpenAI-compatible API key. When enabled, chat messages and saved memories are sent to your configured provider.", color = mutedText, fontSize = 13.sp)
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Use cloud API", Modifier.weight(1f), color = primaryText)
+                        Switch(checked = apiEnabled, onCheckedChange = {
+                            apiEnabled = it
+                            remoteApi.enabled = it
+                        })
+                    }
+                    OutlinedTextField(
+                        value = apiEndpoint,
+                        onValueChange = { apiEndpoint = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("HTTPS chat completions endpoint") }
+                    )
+                    OutlinedTextField(
+                        value = apiModel,
+                        onValueChange = { apiModel = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Model ID") }
+                    )
+                    OutlinedTextField(
+                        value = apiKeyDraft,
+                        onValueChange = { apiKeyDraft = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        label = { Text(if (remoteApi.hasKey()) "API key (saved; enter to replace)" else "API key") }
+                    )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = {
+                            remoteApi.clearKey()
+                            apiKeyDraft = ""
+                            apiStatus = "Saved key deleted."
+                        }) { Text("Delete key") }
+                        TextButton(onClick = {
+                            runCatching {
+                                remoteApi.endpoint = apiEndpoint
+                                remoteApi.model = apiModel
+                                if (apiKeyDraft.isNotBlank()) remoteApi.saveKey(apiKeyDraft)
+                                apiKeyDraft = ""
+                                apiStatus = "API settings saved on this phone."
+                            }.onFailure { apiStatus = "Could not save API settings: ${it.message}" }
+                        }) { Text("Save API") }
+                    }
+                    if (apiStatus.isNotBlank()) Text(apiStatus, color = mutedText, fontSize = 12.sp)
+                    HorizontalDivider(color = border)
+                    Spacer(Modifier.height(12.dp))
                     Text("AI memory", color = primaryText, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     Text("Save important facts NEXUS can use in future conversations. Stored only on this phone.", color = mutedText, fontSize = 13.sp, lineHeight = 18.sp)
                     Spacer(Modifier.height(10.dp))
