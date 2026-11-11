@@ -172,6 +172,7 @@ private fun NexusChatApp(initialPath: String?) {
     var pendingToolApproval by remember { mutableStateOf<PendingToolApproval?>(null) }
     val messages = remember { mutableStateListOf<ChatMessage>() }
     var pendingContactQuery by remember { mutableStateOf<String?>(null) }
+    var pendingContactResults by remember { mutableStateOf<List<ContactResult>>(emptyList()) }
     var pendingCallNumber by remember { mutableStateOf<String?>(null) }
     val callPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val number = pendingCallNumber
@@ -189,7 +190,8 @@ private fun NexusChatApp(initialPath: String?) {
         if (granted && !queryName.isNullOrBlank()) {
             val found = searchContacts(context, queryName)
             val reply = if (found.isEmpty()) "I couldn't find any contacts matching '$queryName'." else "Found ${found.size} matching contact${if (found.size == 1) "" else "s"}. Choose who you want to call:"
-            messages.add(ChatMessage(false, reply, found))
+            if (messages.isNotEmpty()) messages[messages.lastIndex] = ChatMessage(false, reply, found)
+            else messages.add(ChatMessage(false, reply, found))
         } else if (!granted) {
             messages.add(ChatMessage(false, "NEXUS needs Contacts permission to find matching contacts. No contact data was read."))
         }
@@ -849,8 +851,8 @@ private fun NexusChatApp(initialPath: String?) {
                                                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
                                                     val found = withContext(Dispatchers.IO) { searchContacts(context, name) }
                                                     val reply = if (found.isEmpty()) "I couldn't find any contacts matching '$name'." else "Found ${found.size} matching contact${if (found.size == 1) "" else "s"}. Choose who you want to call:"
-                                                    if (messages.isNotEmpty()) messages[messages.lastIndex] = ChatMessage(false, reply, found)
-                                                    null
+                                                    pendingContactResults = found
+                                                    reply
                                                 } else {
                                                     pendingContactQuery = name
                                                     contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
@@ -863,7 +865,8 @@ private fun NexusChatApp(initialPath: String?) {
                                             else -> null
                                         }
                                         if (deviceResult != null) {
-                                            if (messages.isNotEmpty()) messages[messages.lastIndex] = ChatMessage(false, deviceResult)
+                                            if (messages.isNotEmpty()) messages[messages.lastIndex] = ChatMessage(false, deviceResult, pendingContactResults)
+                                            pendingContactResults = emptyList()
                                         } else {
                                         val workspaceIntent = toolRuntime.detectWorkspaceIntent(prompt)
                                         if (workspaceIntent != null) {
