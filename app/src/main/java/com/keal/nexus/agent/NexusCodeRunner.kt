@@ -141,7 +141,7 @@ class NexusCodeRunner(context: Context) {
             .put("version", version)
             .put("files", JSONArray().put(JSONObject().put("name", fileName).put("content", source)))
             .put("stdin", stdin.take(10_000))
-            .put("run_timeout", 5000)
+            .put("run_timeout", 3000)
             .put("compile_timeout", 10000)
         val result = request("/api/v2/execute", payload)
         val run = result.optJSONObject("run") ?: JSONObject()
