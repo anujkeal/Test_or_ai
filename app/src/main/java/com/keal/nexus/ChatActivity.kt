@@ -170,6 +170,8 @@ private fun NexusChatApp(initialPath: String?) {
     var restoringHistory by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var pendingToolApproval by remember { mutableStateOf<PendingToolApproval?>(null) }
+    val messages = remember { mutableStateListOf<ChatMessage>() }
+    var pendingContactQuery by remember { mutableStateOf<String?>(null) }
     var pendingCallNumber by remember { mutableStateOf<String?>(null) }
     val callPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val number = pendingCallNumber
@@ -192,7 +194,6 @@ private fun NexusChatApp(initialPath: String?) {
             messages.add(ChatMessage(false, "NEXUS needs Contacts permission to find matching contacts. No contact data was read."))
         }
     }
-    var pendingContactQuery by remember { mutableStateOf<String?>(null) }
     var downloadId by remember { mutableStateOf(prefs.getLong("active_download_id", -1L).takeIf { it >= 0L }) }
     var downloadModel by remember { mutableStateOf(ModelCatalog.models.firstOrNull { it.id == prefs.getString("active_download_model_id", null) }) }
     var downloadProgress by remember { mutableFloatStateOf(0f) }
@@ -202,7 +203,6 @@ private fun NexusChatApp(initialPath: String?) {
     var importProgressKnown by remember { mutableStateOf(false) }
     var importError by remember { mutableStateOf<String?>(null) }
     var installed by remember { mutableStateOf(ModelManager.installedModels(context)) }
-    val messages = remember { mutableStateListOf<ChatMessage>() }
     val listState = rememberLazyListState()
 
     val isDark = when (themeMode) {
