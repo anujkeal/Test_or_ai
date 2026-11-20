@@ -19,6 +19,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -864,7 +865,7 @@ private fun NexusChatApp(initialPath: String?) {
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Voice chat") }, leadingIcon = { Text("🎙") },
+                                text = { Text("Voice chat") }, leadingIcon = { NexusMicIcon(primaryText) },
                                 onClick = {
                                     showComposerActions = false
                                     context.startActivity(Intent(context, VoiceActivity::class.java)
@@ -878,7 +879,7 @@ private fun NexusChatApp(initialPath: String?) {
                         onValueChange = { input = it },
                         modifier = Modifier.weight(1f),
                         enabled = ready && !generating && !restoringHistory,
-                        placeholder = { Text(if (ready) "Message NEXUS" else "Choose a model to start", color = mutedText, fontSize = 16.sp) },
+                        placeholder = { Text(if (ready) "Ask NEXUS..." else "Choose a model to start", color = mutedText, fontSize = 16.sp) },
                         maxLines = 5,
                         shape = CircleShape,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -894,7 +895,7 @@ private fun NexusChatApp(initialPath: String?) {
                             .putExtra(VoiceActivity.EXTRA_MODEL_PATH, modelPath))
                     }, color = Color.Transparent, shape = CircleShape) {
                         Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                            Text("🎙", fontSize = 20.sp, color = primaryText)
+                            NexusMicIcon(primaryText)
                         }
                     }
                     Surface(
@@ -1918,6 +1919,31 @@ private fun NexusChatApp(initialPath: String?) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun NexusMicIcon(color: Color) {
+    Canvas(Modifier.size(22.dp)) {
+        val line = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.1f)
+        drawRoundRect(
+            color = color,
+            topLeft = androidx.compose.ui.geometry.Offset(size.width * .36f, size.height * .06f),
+            size = androidx.compose.ui.geometry.Size(size.width * .28f, size.height * .54f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12f, 12f),
+            style = line
+        )
+        drawArc(
+            color = color,
+            startAngle = 0f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = androidx.compose.ui.geometry.Offset(size.width * .18f, size.height * .24f),
+            size = androidx.compose.ui.geometry.Size(size.width * .64f, size.height * .58f),
+            style = line
+        )
+        drawLine(color, androidx.compose.ui.geometry.Offset(size.width * .5f, size.height * .82f), androidx.compose.ui.geometry.Offset(size.width * .5f, size.height * .98f), strokeWidth = 2.1f)
+        drawLine(color, androidx.compose.ui.geometry.Offset(size.width * .32f, size.height * .98f), androidx.compose.ui.geometry.Offset(size.width * .68f, size.height * .98f), strokeWidth = 2.1f)
     }
 }
 
