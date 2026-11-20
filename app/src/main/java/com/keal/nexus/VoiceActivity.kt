@@ -33,6 +33,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.border
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -70,10 +72,10 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
     val engine = remember { runCatching { AiChat.getInferenceEngine(context.applicationContext) }.getOrNull() }
-    val bg = Color(0xFF05070B)
-    val ink = Color(0xFFF2F5FA)
-    val muted = Color(0xFF8A94A6)
-    val accent = Color(0xFF5EE0B0)
+    val bg = Color(0xFF090616)
+    val ink = Color(0xFFF7F4FF)
+    val muted = Color(0xFFA39AB8)
+    val accent = Color(0xFFA36BFF)
 
     var visualState by remember { mutableStateOf(VoiceVisualState.IDLE) }
     var status by remember { mutableStateOf("Tap the microphone to talk") }
@@ -497,118 +499,214 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
     val offsetY = remember { FloatArray(1800) }
 
     Surface(color = bg, modifier = Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().padding(top = 12.dp, bottom = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onClose) { Text("×", color = ink, fontSize = 30.sp, fontWeight = FontWeight.Light) }
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Voice", color = ink, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(6.dp).background(accent, CircleShape))
-                        Spacer(Modifier.width(6.dp))
-                        Text("NEXUS · on device", color = muted, fontSize = 12.sp)
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFF0D091B), Color(0xFF090616), Color(0xFF10091F))
+                )
+            )
+        ) {
+            Column(
+                Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()
+                    .padding(horizontal = 22.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().height(58.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        onClick = onClose,
+                        color = Color.Transparent,
+                        shape = CircleShape
+                    ) {
+                        Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+                            Text("×", color = ink, fontSize = 30.sp, fontWeight = FontWeight.Light)
+                        }
+                    }
+                    Column(
+                        Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("NEXUS", color = ink, fontSize = 21.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.width(18.dp).height(1.dp).background(muted.copy(alpha = .65f)))
+                            Spacer(Modifier.width(8.dp))
+                            Text("V O I C E", color = muted, fontSize = 10.sp, letterSpacing = 2.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Box(Modifier.width(18.dp).height(1.dp).background(muted.copy(alpha = .65f)))
+                        }
+                    }
+                    Spacer(Modifier.size(44.dp))
+                }
+
+                Box(
+                    Modifier.weight(1f).fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Canvas(
+                        Modifier.fillMaxWidth(.96f).aspectRatio(1f)
+                            .pointerInput(Unit) {
+                                detectDragGestures(
+                                    onDragEnd = { pointer = Offset.Unspecified },
+                                    onDragCancel = { pointer = Offset.Unspecified }
+                                ) { change, _ -> pointer = change.position }
+                            }
+                            .pointerInput(Unit) { detectTapGestures { pointer = it } }
+                    ) {
+                        val size = min(this.size.width, this.size.height)
+                        val cx = this.size.width / 2f
+                        val cy = this.size.height / 2f
+                        val baseRadius = size * radius * .5f
+                        val tiltCos = cos(.35f)
+                        val tiltSin = sin(.35f)
+                        dots.forEachIndexed { index, dot ->
+                            val a = angle + twist * dot.y * sin(time * 1.3f)
+                            val ca = cos(a)
+                            val sa = sin(a)
+                            val x1 = dot.x * ca + dot.z * sa
+                            val z1 = -dot.x * sa + dot.z * ca
+                            val y2 = dot.y * tiltCos - z1 * tiltSin
+                            val z2 = dot.y * tiltSin + z1 * tiltCos
+                            val pulse = if (visualState == VoiceVisualState.IDLE || visualState == VoiceVisualState.THINKING) .03f * sin(time * 2f) else 0f
+                            val motion = 1f + pulse +
+                                ripple * level * sin(dot.y * 7f - time * 5f) +
+                                jitter * level * dot.seed * .4f * sin(time * 8f + dot.phase)
+                            val perspective = 1f + z2 * .22f
+                            var x = cx + x1 * motion * baseRadius * perspective + offsetX[index]
+                            var y = cy + y2 * motion * baseRadius * perspective + offsetY[index]
+                            if (pointer != Offset.Unspecified) {
+                                val dx = x - pointer.x
+                                val dy = y - pointer.y
+                                val distanceSquared = dx * dx + dy * dy
+                                if (distanceSquared < 7000f) {
+                                    val distance = sqrt(distanceSquared) + .01f
+                                    val force = (84f - distance) / 84f
+                                    offsetX[index] += dx / distance * force * 7f
+                                    offsetY[index] += dy / distance * force * 7f
+                                }
+                            }
+                            offsetX[index] *= .9f
+                            offsetY[index] *= .9f
+                            x = cx + x1 * motion * baseRadius * perspective + offsetX[index]
+                            y = cy + y2 * motion * baseRadius * perspective + offsetY[index]
+                            val alpha = (.18f + .82f * (z2 * .5f + .5f)).coerceIn(.12f, 1f)
+                            val dotSize = (.7f + dot.seed * .9f) * perspective
+                            drawCircle(accent.copy(alpha = alpha), radius = dotSize.coerceAtLeast(.35f), center = Offset(x, y))
+                        }
                     }
                 }
-                Spacer(Modifier.width(48.dp))
-            }
-            Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
-                Canvas(
-                    Modifier.fillMaxWidth().aspectRatio(1f)
-                        .pointerInput(Unit) {
-                            detectDragGestures(
-                                onDragEnd = { pointer = Offset.Unspecified },
-                                onDragCancel = { pointer = Offset.Unspecified }
-                            ) { change, _ -> pointer = change.position }
-                        }
-                        .pointerInput(Unit) { detectTapGestures { pointer = it } }
+
+                Surface(
+                    color = Color(0xFF171126),
+                    shape = CircleShape,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = .24f))
                 ) {
-                    val size = min(this.size.width, this.size.height)
-                    val cx = this.size.width / 2f
-                    val cy = this.size.height / 2f
-                    val baseRadius = size * radius * .5f
-                    val tiltCos = cos(.35f)
-                    val tiltSin = sin(.35f)
-                    dots.forEachIndexed { index, dot ->
-                        val a = angle + twist * dot.y * sin(time * 1.3f)
-                        val ca = cos(a)
-                        val sa = sin(a)
-                        val x1 = dot.x * ca + dot.z * sa
-                        val z1 = -dot.x * sa + dot.z * ca
-                        val y2 = dot.y * tiltCos - z1 * tiltSin
-                        val z2 = dot.y * tiltSin + z1 * tiltCos
-                        val pulse = if (visualState == VoiceVisualState.IDLE || visualState == VoiceVisualState.THINKING) .03f * sin(time * 2f) else 0f
-                        val motion = 1f + pulse +
-                            ripple * level * sin(dot.y * 7f - time * 5f) +
-                            jitter * level * dot.seed * .4f * sin(time * 8f + dot.phase)
-                        val perspective = 1f + z2 * .22f
-                        var x = cx + x1 * motion * baseRadius * perspective + offsetX[index]
-                        var y = cy + y2 * motion * baseRadius * perspective + offsetY[index]
-                        if (pointer != Offset.Unspecified) {
-                            val dx = x - pointer.x
-                            val dy = y - pointer.y
-                            val distanceSquared = dx * dx + dy * dy
-                            if (distanceSquared < 7000f) {
-                                val distance = sqrt(distanceSquared) + .01f
-                                val force = (84f - distance) / 84f
-                                offsetX[index] += dx / distance * force * 7f
-                                offsetY[index] += dy / distance * force * 7f
+                    Row(
+                        Modifier.padding(horizontal = 18.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(Modifier.size(7.dp).background(accent, CircleShape))
+                        Spacer(Modifier.width(9.dp))
+                        Text(if (visualState == VoiceVisualState.LISTENING) "Listening on device" else "On device", color = ink, fontSize = 13.sp)
+                    }
+                }
+                Spacer(Modifier.height(18.dp))
+                Text(status, color = ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                Spacer(Modifier.height(5.dp))
+                Text(caption, color = muted, fontSize = 12.sp, maxLines = 2)
+                if (transcript.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(transcript, color = ink.copy(alpha = .9f), fontSize = 13.sp, maxLines = 2)
+                }
+                if (response.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(response, color = muted, fontSize = 12.sp, maxLines = 2)
+                }
+                if (error != null) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(error.orEmpty(), color = Color(0xFFFF929D), fontSize = 12.sp, maxLines = 2)
+                }
+                Spacer(Modifier.height(20.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        Modifier.width(58.dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf(8, 17, 27, 17, 8).forEach { h ->
+                            Box(Modifier.width(3.dp).height(h.dp).background(accent.copy(alpha = .65f), CircleShape))
+                        }
+                    }
+                    Spacer(Modifier.width(18.dp))
+                    Box(
+                        Modifier.size(112.dp).border(1.dp, accent.copy(alpha = .24f), CircleShape).padding(8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            onClick = {
+                                if (visualState == VoiceVisualState.LISTENING) {
+                                    speechRecognizer?.cancel()
+                                    visualState = VoiceVisualState.IDLE
+                                    status = "Listening cancelled"
+                                } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                                    startListeningRequested = true
+                                } else {
+                                    permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                }
+                            },
+                            color = if (visualState == VoiceVisualState.LISTENING) accent else Color(0xFFF6F2FF),
+                            contentColor = bg,
+                            shape = CircleShape,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Canvas(Modifier.size(36.dp)) {
+                                    val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.2f)
+                                    drawRoundRect(
+                                        color = bg,
+                                        topLeft = Offset(size.width * .36f, size.height * .08f),
+                                        size = androidx.compose.ui.geometry.Size(size.width * .28f, size.height * .54f),
+                                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(18f, 18f),
+                                        style = stroke
+                                    )
+                                    drawArc(
+                                        color = bg,
+                                        startAngle = 0f,
+                                        sweepAngle = 180f,
+                                        useCenter = false,
+                                        topLeft = Offset(size.width * .19f, size.height * .25f),
+                                        size = androidx.compose.ui.geometry.Size(size.width * .62f, size.height * .58f),
+                                        style = stroke
+                                    )
+                                    drawLine(bg, Offset(size.width * .5f, size.height * .82f), Offset(size.width * .5f, size.height * .98f), strokeWidth = 3.2f)
+                                    drawLine(bg, Offset(size.width * .34f, size.height * .98f), Offset(size.width * .66f, size.height * .98f), strokeWidth = 3.2f)
+                                }
                             }
                         }
-                        offsetX[index] *= .9f
-                        offsetY[index] *= .9f
-                        x = cx + x1 * motion * baseRadius * perspective + offsetX[index]
-                        y = cy + y2 * motion * baseRadius * perspective + offsetY[index]
-                        val alpha = (.18f + .82f * (z2 * .5f + .5f)).coerceIn(.12f, 1f)
-                        val dotSize = (.7f + dot.seed * .9f) * perspective
-                        drawCircle(ink.copy(alpha = alpha), radius = dotSize.coerceAtLeast(.35f), center = Offset(x, y))
+                    }
+                    Spacer(Modifier.width(18.dp))
+                    Row(
+                        Modifier.width(58.dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf(8, 17, 27, 17, 8).forEach { h ->
+                            Box(Modifier.width(3.dp).height(h.dp).background(accent.copy(alpha = .65f), CircleShape))
+                        }
                     }
                 }
-            }
-            Text(status, color = ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(6.dp))
-            Text(caption, color = muted, fontSize = 13.sp, maxLines = 2)
-            if (transcript.isNotBlank()) {
-                Spacer(Modifier.height(10.dp))
-                Text("YOU", color = accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                Text(transcript, color = ink, fontSize = 14.sp, maxLines = 3)
-            }
-            if (response.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))
-                Text("NEXUS", color = accent, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                Text(response, color = ink, fontSize = 14.sp, maxLines = 4)
-            }
-            if (error != null) {
-                Spacer(Modifier.height(6.dp))
-                Text(error.orEmpty(), color = Color(0xFFE88991), fontSize = 12.sp, maxLines = 3)
-            }
-            Spacer(Modifier.height(18.dp))
-            Surface(
-                onClick = {
-                    if (visualState == VoiceVisualState.LISTENING) {
-                        speechRecognizer?.cancel()
-                        visualState = VoiceVisualState.IDLE
-                        status = "Listening cancelled"
-                    } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                        startListeningRequested = true
-                    } else {
-                        permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                    }
-                },
-                color = if (visualState == VoiceVisualState.LISTENING) accent else ink,
-                contentColor = bg,
-                shape = CircleShape,
-                modifier = Modifier.size(76.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(if (visualState == VoiceVisualState.LISTENING) "■" else "●", fontSize = 24.sp)
+                Text("Tap to speak", color = muted, fontSize = 11.sp)
+                TextButton(onClick = {
+                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }) {
+                    Text("Set up app control", color = accent, fontSize = 12.sp)
                 }
-            }
-            Spacer(Modifier.height(10.dp))
-            Text("Tap to speak · on-device recognition", color = muted, fontSize = 11.sp)
-            TextButton(onClick = {
-                context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            }) {
-                Text("Set up app control", color = accent, fontSize = 12.sp)
             }
         }
-    }
-}
+    }}
