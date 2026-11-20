@@ -709,4 +709,5 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
                 }
             }
         }
-    }}
+    }
+}
