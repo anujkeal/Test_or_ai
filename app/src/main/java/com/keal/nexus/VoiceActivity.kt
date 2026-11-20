@@ -19,12 +19,14 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.border
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -524,17 +527,20 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
                             Text("×", color = ink, fontSize = 30.sp, fontWeight = FontWeight.Light)
                         }
                     }
-                    Column(
+                    Row(
                         Modifier.weight(1f),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("NEXUS", color = ink, fontSize = 21.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.width(18.dp).height(1.dp).background(muted.copy(alpha = .65f)))
-                            Spacer(Modifier.width(8.dp))
-                            Text("V O I C E", color = muted, fontSize = 10.sp, letterSpacing = 2.sp)
-                            Spacer(Modifier.width(8.dp))
-                            Box(Modifier.width(18.dp).height(1.dp).background(muted.copy(alpha = .65f)))
+                        Image(
+                            painter = painterResource(R.drawable.nexus_logo),
+                            contentDescription = "NEXUS logo",
+                            modifier = Modifier.size(42.dp).clip(RoundedCornerShape(12.dp))
+                        )
+                        Spacer(Modifier.width(11.dp))
+                        Column(horizontalAlignment = Alignment.Start) {
+                            Text("NEXUS", color = ink, fontSize = 21.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+                            Text("V O I C E", color = muted, fontSize = 10.sp, letterSpacing = 2.2.sp)
                         }
                     }
                     Spacer(Modifier.size(44.dp))
@@ -614,7 +620,7 @@ private fun VoiceAssistantScreen(modelPath: String?, onClose: () -> Unit) {
                 Spacer(Modifier.height(18.dp))
                 Text(status, color = ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                 Spacer(Modifier.height(5.dp))
-                Text(caption, color = muted, fontSize = 12.sp, maxLines = 2)
+                Text(caption, color = muted, fontSize = 11.sp, maxLines = 2)
                 if (transcript.isNotBlank()) {
                     Spacer(Modifier.height(8.dp))
                     Text(transcript, color = ink.copy(alpha = .9f), fontSize = 13.sp, maxLines = 2)
