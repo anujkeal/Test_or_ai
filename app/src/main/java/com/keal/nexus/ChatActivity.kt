@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arm.aichat.AiChat
@@ -658,7 +659,7 @@ private fun NexusChatApp(initialPath: String?) {
                                 Image(
                                     painter = painterResource(R.drawable.nexus_logo),
                                     contentDescription = "NEXUS AI",
-                                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp))
+                                    modifier = Modifier.size(54.dp).clip(RoundedCornerShape(15.dp))
                                 )
                                 Spacer(Modifier.width(12.dp))
                                 Column {
@@ -669,13 +670,15 @@ private fun NexusChatApp(initialPath: String?) {
                                     )
                                 }
                             }
-                            Spacer(Modifier.height(42.dp))
+                            Spacer(Modifier.height(48.dp))
                             Text(
                                 "What do you want to do?",
+                                modifier = Modifier.fillMaxWidth(),
                                 color = primaryText,
                                 fontSize = 27.sp,
                                 lineHeight = 33.sp,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.Center
                             )
                             Spacer(Modifier.height(24.dp))
                             Row(
@@ -689,17 +692,17 @@ private fun NexusChatApp(initialPath: String?) {
                                 ).forEach { (symbol, label, prompt) ->
                                     Surface(
                                         onClick = { input = prompt },
-                                        modifier = Modifier.weight(1f).height(142.dp),
+                                        modifier = Modifier.weight(1f).height(150.dp),
                                         color = if (label == "Think") NexusPurple.copy(alpha = if (isDark) .20f else .09f) else surface,
                                         contentColor = primaryText,
-                                        shape = RoundedCornerShape(18.dp),
+                                        shape = RoundedCornerShape(16.dp),
                                         border = androidx.compose.foundation.BorderStroke(
                                             1.dp,
                                             if (label == "Think") NexusPurple.copy(alpha = .24f) else border
                                         )
                                     ) {
                                         Column(
-                                            Modifier.fillMaxSize().padding(horizontal = 7.dp, vertical = 18.dp),
+                                            Modifier.fillMaxSize().padding(horizontal = 7.dp, vertical = 16.dp),
                                             horizontalAlignment = Alignment.CenterHorizontally,
                                             verticalArrangement = Arrangement.Center
                                         ) {
